@@ -1,6 +1,19 @@
 import { User } from "../models/User.js";
 import bcrypt from "bcrypt";
 
+const BorrowerHome = async (req, res) => {
+  try {
+    return res.status(200).json({
+      message: "Welcome to Borrower Home",
+    });
+  } catch (e) {
+    console.log(e);
+    res
+      .status(e.code || 500)
+      .json({ message: "Internal Server Error", error: e.message });
+  }
+};
+
 const BorrowerSignUp = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -46,6 +59,41 @@ const BorrowerSignUp = async (req, res) => {
   }
 };
 
-export {
-    BorrowerSignUp,
-}
+const BorrowerLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    // Check if email and password are provided
+    if (!email || !password) {
+      return res.status(404).json({
+        message: "Please fill all the fields",
+      });
+    }
+    const user = await User.findOne(email);
+    if (!user) {
+      res.status(404).json({
+        message: "Borrower not found",
+      });
+    }
+
+    const isPasswordMatch = await bcrypt.compare(password, user.password);
+    if (!isPasswordMatch) {
+      res.status(401).json({
+        message: "Invalid password",
+      });
+    }
+    const createdUser = await User.findById(user._id).select("-passsword");
+
+    return res.status(200).json({
+      message: "User logged in successfully as Borrower",
+      data: createdUser,
+    });
+  } catch (err) {
+    console.log(err);
+    return res.status(err.code).json({
+      message: "Internal Server Error",
+      error: err.message,
+    });
+  }
+};
+
+export {BorrowerHome, BorrowerSignUp, BorrowerLogin };

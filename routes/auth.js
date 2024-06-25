@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { LenderLogin, LenderSignUp } from "../controller/lender.js";
-import { BorrowerSignUp } from "../controller/borrower.js";
+import { LenderHome, LenderLogin, LenderSignUp } from "../controller/lender.js";
+import { BorrowerHome, BorrowerSignUp } from "../controller/borrower.js";
 
 const router = Router();
 
@@ -10,5 +10,9 @@ router.route("/signup/borrower").post(BorrowerSignUp);
 
 //Login Route
 router.route("/login/lender").post(LenderLogin);
+
+// HomeRoute
+router.route("/lenderhome").get(LenderHome)
+router.route("/borrowerhome").get(BorrowerHome)
 
 export default router;

@@ -1,6 +1,20 @@
 import { User } from "../models/User.js";
 import bcrypt from "bcrypt";
 
+const LenderHome = async (req, res) => {
+  try {
+    return res.status(200).json({
+      message: "Welcome to Lender Home",
+    });
+  } catch (err) {
+    console.log(err);
+    res.status(err.code).json({
+      message: err.message,
+      success: false,
+    });
+  }
+};
+
 const LenderSignUp = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -58,7 +72,7 @@ const LenderLogin = async (req, res) => {
     const user = await User.findOne(email);
     if (!user) {
       res.status(404).json({
-        message: "User not found",
+        message: "Lender not found",
       });
     }
 
@@ -70,14 +84,10 @@ const LenderLogin = async (req, res) => {
     }
     const createdUser = await User.findById(user._id).select("-passsword");
 
-    if (!createdUser) {
-      return res.status(400).json({ message: "User not created" });
-    }
-
     return res.status(200).json({
-      message: "User logged in successfully",
+      message: "User logged in successfully as Lender",
       data: createdUser,
-    })
+    });
   } catch (err) {
     console.log(err);
     return res.status(err.code).json({
@@ -87,4 +97,4 @@ const LenderLogin = async (req, res) => {
   }
 };
 
-export { LenderSignUp,LenderLogin };
+export { LenderHome, LenderSignUp, LenderLogin };
