@@ -1,5 +1,7 @@
 import express from "express";
-
+import connectDb from "../config/db.js";
+import {createUserWithEmailAndPassword,signInWithEmailAndPassword} from 'firebase/auth';
+import {auth} from '../config/firebase-config.js'
 const router = express.Router();
 //POST - Register new user
 router.post("/signup", async (req, res) => {
