@@ -1,6 +1,4 @@
 import { Router } from "express";
-import { LenderHome, LenderLogin, LenderSignUp } from "../controller/lender.js";
-import { BorrowerHome, BorrowerSignUp } from "../controller/borrower.js";
 import bcrypt from 'bcrypt'
 
 const router = Router();
