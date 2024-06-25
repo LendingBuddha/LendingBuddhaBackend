@@ -1,11 +1,14 @@
-const router = require("express").Router();
+import { Router } from "express";
+import { LenderLogin, LenderSignUp } from "../controller/lender.js";
+import { BorrowerSignUp } from "../controller/borrower.js";
 
+const router = Router();
 
-//register
+//Registeration Route
+router.route("/signup/lender").post(LenderSignUp);
+router.route("/signup/borrower").post(BorrowerSignUp);
 
-//login
+//Login Route
+router.route("/login/lender").post(LenderLogin);
 
-
-
-
-module.exports = router;
+export default router;
