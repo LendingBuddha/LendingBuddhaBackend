@@ -9,7 +9,6 @@ const BorrowerSchema = new Schema({
     panCard: { type: String, required: true, unique: true },
     aadharCard: { type: String, required: true, unique: true },
     dateOfBirth: { type: Date, required: true },
-    password: { type: String, required: true, select: false },
     profilePic: { type: String, default: "" },
 
 }, { timestamps: true });
