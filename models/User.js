@@ -8,13 +8,12 @@ const UserSchema = new mongoose.Schema(
       unique: true,
     },
     password: { type: String, required: [true,"Enter At least 6 Character"] },
-    profilePic: { type: String, default: "" },
   },
   { timestamps: true }
 );
 
 // Always export Module With Same of Model Name
-const User = mongoose.model("User", UserSchema);
+export const User = mongoose.model("User", UserSchema);
 
 
-export { User };
+
