@@ -29,7 +29,7 @@ router.post("/signup/lender", async (req, res) => {
   try {
 
 
-    const LenderUser = await Lender.findOne(email);
+    const LenderUser = await Lender.findOne({email});
 
     if (LenderUser) return res.send("User Exists");
 
@@ -61,16 +61,15 @@ router.post("/signup/lender", async (req, res) => {
       data: createdUser,
     });
   } catch (error) {
-    const errorCode = error.code;
-    const errorMessage = error.message;
-    res.status(errorCode).send({ error: errorMessage });
+    
+    res.status(500).send({ error: error.message });
   }
 });
 router.post("/signup/borrower", async (req, res) => {
   const { fullname, email, password, dob, pancard, aadharcard, phonenumber } =
     req.body;
   try {
-    const BorrowerUser = await Borrower.findOne(email);
+    const BorrowerUser = await Borrower.findOne({email});
     if (BorrowerUser) return res.send("User Exists");
 
     const userCredential = await createUserWithEmailAndPassword(
@@ -104,7 +103,7 @@ router.post("/signup/borrower", async (req, res) => {
   } catch (error) {
     const errorCode = error.code;
     const errorMessage = error.message;
-    res.status(errorCode).send({ error: errorMessage });
+    res.status(500).send({ error: errorMessage });
   }
 });
 

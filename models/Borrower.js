@@ -4,7 +4,7 @@ const BorrowerSchema = new Schema(
   {
     fullname: { type: String, required: true },
 
-    email: { type: String, required: true, unique: true },
+    email: { type: String, index: true, required: true, unique: true },
 
     phoneNumber: { type: String, required: true },
 
