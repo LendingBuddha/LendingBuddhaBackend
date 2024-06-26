@@ -23,6 +23,6 @@ app.get("/", (req, res) => {
   res.send("Hello, World!");
 });
 
-app.get("/login",(req,res)=>{
-    res.send("login page");
-})
+server.listen(port, hostname, () => {
+    console.log(`Server running at http://${hostname}:${port}/`);
+});
