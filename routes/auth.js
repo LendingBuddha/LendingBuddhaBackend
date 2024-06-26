@@ -1,5 +1,4 @@
 import { Router } from "express";
-import connectDb from "../config/db.js";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
