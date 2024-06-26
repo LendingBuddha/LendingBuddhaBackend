@@ -3,20 +3,15 @@ const Schema = mongoose.Schema;
 
 const BorrowerSchema = new Schema({
 
-    fullname:{type:String,required:true,},
-
-    email:{type:String, required:true,},
-    
+    fullname: { type: String, required: true, },
+    email: { type: String, required: true, },
     phoneNumber: { type: String, required: true },
-
     panCard: { type: String, required: true, unique: true },
-
     aadharCard: { type: String, required: true, unique: true },
-
     dateOfBirth: { type: Date, required: true },
+    password: { type: String, required: true, select: false },
+    profilePic: { type: String, default: "" },
 
-    password: { type: String, required: true, select: false }, 
-   
 }, { timestamps: true });
 
 module.exports = mongoose.model('Borrower', BorrowerSchema);
