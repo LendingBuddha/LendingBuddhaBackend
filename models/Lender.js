@@ -12,6 +12,7 @@ const LenderSchema = new Schema(
     aadharCard: { type: String, required: true, unique: true },
     dateOfBirth: { type: Date, required: true },
     uid: { type: String },
+    profilePic:{type:String}
   },
   { timestamps: true }
 );
