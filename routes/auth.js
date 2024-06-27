@@ -6,11 +6,18 @@ import {
 import { auth } from "../config/firebase-config.js";
 import { Lender } from "../models/Lender.js";
 import { Borrower } from "../models/Borrower.js";
+import jwt from 'jsonwebtoken'
 import bcrypt from "bcrypt";
 import verifyToken from "../middleware/authencate.js";
 import jwt from "jsonwebtoken";
 
 const router = Router();
+
+const jwtsecret=process.env.JWT_SECRET_KEY;
+
+const generateJWT = (uid) => {
+  return jwt.sign({ uid }, jwtsecret, { expiresIn: '60d' });
+};
 
 //POST - Register new user
 router.post("/signup/lender", async (req, res) => {
@@ -144,6 +151,7 @@ router.post("/login/lender", async (req, res) => {
       res.status(500).send(errorMessage);
     });
 });
+
 router.post("/login/borrower", async (req, res) => {
   const { email, password } = req.body;
   console.log(email, password);
@@ -183,6 +191,7 @@ router.post("/login/borrower", async (req, res) => {
       res.status(500).send(errorMessage);
     });
 });
+
 
 // GET - HOME_ROUTE
 router.route("/lenderhome").get(verifyToken, async (req, res) => {
