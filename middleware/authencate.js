@@ -1,4 +1,4 @@
-
+import jwt from "jsonwebtoken"
 // This Method for Firebase Token Authnetication
 
 
@@ -25,7 +25,7 @@
 // Middleware to verify JWT token
 const verifyToken = async (req, res, next) => {
     // Get token from cookies or Authorization header
-    let idToken = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "");
+    const idToken = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "");
   
     // Check if token is undefined or empty
     if (!idToken) {
@@ -34,7 +34,7 @@ const verifyToken = async (req, res, next) => {
   
     try {
       // Verify token
-      const decoded = await jwt.verify(idToken, JWT_SECRET_KEY);
+      const decoded = jwt.verify(idToken, process.env.JWT_SECRET_KEY);
       req.user = decoded;
       next(); 
     } catch (err) {

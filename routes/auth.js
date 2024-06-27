@@ -8,9 +8,9 @@ import { Lender } from "../models/Lender.js";
 import { Borrower } from "../models/Borrower.js";
 import bcrypt from "bcrypt";
 import verifyToken from "../middleware/authencate.js";
+import jwt from "jsonwebtoken";
 
 const router = Router();
-
 
 //POST - Register new user
 router.post("/signup/lender", async (req, res) => {
@@ -31,8 +31,8 @@ router.post("/signup/lender", async (req, res) => {
     const hashPan = await bcrypt.hash(pancard, 10);
     const hashAadhar = await bcrypt.hash(aadharcard, 10);
 
-    console.log("PanCard \t ",hashPan)
-    console.log("Aadhar \t ",hashAadhar)
+    console.log("PanCard \t ", hashPan);
+    console.log("Aadhar \t ", hashAadhar);
 
     const Lenderuser = await Lender.create({
       email,
@@ -74,8 +74,8 @@ router.post("/signup/borrower", async (req, res) => {
     const hashPan = await bcrypt.hash(pancard, 10);
     const hashAadhar = await bcrypt.hash(aadharcard, 10);
 
-    console.log("PanCard \t ",hashPan)
-    console.log("Aadhar \t ",hashAadhar)
+    console.log("PanCard \t ", hashPan);
+    console.log("Aadhar \t ", hashAadhar);
 
     const borrowerUser = await Borrower.create({
       email,
@@ -83,7 +83,7 @@ router.post("/signup/borrower", async (req, res) => {
       phoneNumber: phonenumber,
       dateOfBirth: dob,
       panCard: hashPan,
-      aadharCard:hashAadhar,
+      aadharCard: hashAadhar,
       uid: user.uid,
     });
 
@@ -114,52 +114,99 @@ router.post("/login/lender", async (req, res) => {
       // Signed in
       const user = userCredential.user;
       // ...
-      res.send(user);
+      const accessToken = jwt.sign(
+        { uid: user.uid },
+        process.env.JWT_SECRET_KEY,
+        { expiresIn: "30m" }
+      );
+
+      const refreshToken = jwt.sign(
+        { uid: user.uid },
+        process.env.JWT_SECRET_KEY,
+        { expiresIn: "30d" }
+      );
+
+      // Set refresh token in an HTTP-only and secure cookie
+      res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: true,
+        // sameSite: "strict",
+      });
+
+      res.setHeader("Authorization", `Bearer ${accessToken}`);
+
+      // Send response indicating successful login
+      res.status(200).json({ message: "User logged in successfully", user });
     })
     .catch((error) => {
       const errorCode = error.code;
       const errorMessage = error.message;
-      res.status(errorCode).send(errorMessage);
+      res.status(500).send(errorMessage);
     });
 });
 router.post("/login/borrower", async (req, res) => {
   const { email, password } = req.body;
-  console.log(email,password)
+  console.log(email, password);
 
   signInWithEmailAndPassword(auth, email, password)
     .then((userCredential) => {
       // Signed in
       const user = userCredential.user;
-      console.log(user);
+      // console.log(user);
       // ...
-      res.status(200).json(user);
+      const refreshToken = jwt.sign(
+        { uid: user.uid },
+        process.env.JWT_SECRET_KEY,
+        { expiresIn: "30d" }
+      );
+      const accessToken = jwt.sign(
+        { uid: user.uid },
+        process.env.JWT_SECRET_KEY,
+        { expiresIn: "30m" }
+      );
+
+      // Set refresh token in an HTTP-only and secure cookie
+      res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: true,
+        // sameSite: "strict",
+      });
+
+      res.setHeader("Authorization", `Bearer ${accessToken}`);
+
+      // Send response indicating successful login
+      res.status(200).json({ message: "User logged in successfully", user });
     })
     .catch((error) => {
       const errorCode = error.code;
       const errorMessage = error.message;
-      res.status(errorCode).send(errorMessage);
+      res.status(500).send(errorMessage);
     });
 });
 
 // GET - HOME_ROUTE
-router.route("/lenderhome").get(verifyToken,async (req, res) => {
+router.route("/lenderhome").get(verifyToken, async (req, res) => {
   try {
-    return res.status(200).send("Welcome to Lender Home",req.user);
+    return res.status(200).json({
+      message: "Welcome to Protected Route of Lender Home",
+      data: req.user.uid,
+    });
   } catch (e) {
     console.log(e);
     res
-      .status(e.code || 500)
+      .status(500)
       .json({ message: "Internal Server Error", error: e.message });
   }
 });
-router.route("/borrowerhome").get(verifyToken,async (req, res) => {
+router.route("/borrowerhome").get(verifyToken, async (req, res) => {
   try {
-    return res.status(200).send("Welcome to Borrower Home",req.user);
+    return res.status(200).json({
+      message: "Welcome to Protected Route of Borrower Home",
+      data: req.user.uid,
+    });
   } catch (e) {
     console.log(e);
-    res
-      .status(e.code || 500)
-      .json({ message: "Internal Server Error", error: e.message });
+    res.json({ message: "Internal Server Error", error: e.message });
   }
 });
 router.route("/").get(async (req, res) => {
@@ -170,6 +217,34 @@ router.route("/").get(async (req, res) => {
     return res.status(error.code).json({
       message: error.message,
     });
+  }
+});
+
+// UTILS ROUTES
+//for Refresh-Token
+router.route("/refresh-token").post(verifyToken, async (req, res) => {
+  try {
+    const refreshToken = req.cookies.refreshToken;
+    if (!refreshToken) {
+      return res.status(401).send("No Refresh Token in Cookies");
+    }
+    // Verify refresh token
+    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET_KEY);
+    // Check if token verification failed
+    if (!decoded) {
+      return res.status(403).json({ error: "Invalid refresh token" });
+    }
+    const accessToken = jwt.sign(
+      { uid: decoded.uid },
+      process.env.JWT_SECRET_KEY,
+      { expiresIn: "60m" }
+    );
+    res.setHeader("Authorization", `Bearer ${accessToken}`);
+
+    res.json({ accessToken });
+  } catch (error) {
+    console.error("Error refreshing token:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 

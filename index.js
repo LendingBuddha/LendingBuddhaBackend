@@ -1,13 +1,15 @@
 import express from "express";
 import AuthRoute from "./routes/auth.js";
 import connectDb from "./config/db.js";
+import cookieParser from "cookie-parser";
 
 const app = express();
+
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 app.use(express.static("public"));
-// app.use(cookieparser()); // We need Cookie-parser package for that
+app.use(cookieParser()); 
 
 
 await connectDb()
