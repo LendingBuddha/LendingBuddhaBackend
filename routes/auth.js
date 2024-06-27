@@ -9,14 +9,14 @@ import { Borrower } from "../models/Borrower.js";
 import jwt from 'jsonwebtoken'
 import bcrypt from "bcrypt";
 import verifyToken from "../middleware/authencate.js";
-import jwt from "jsonwebtoken";
+
 
 const router = Router();
 
 const jwtsecret=process.env.JWT_SECRET_KEY;
 
-const generateJWT = (uid) => {
-  return jwt.sign({ uid }, jwtsecret, { expiresIn: '60d' });
+const generateJWT = (uid,time) => {
+  return jwt.sign({ uid:uid }, jwtsecret, { expiresIn: `${time}` });
 };
 
 //POST - Register new user
@@ -121,17 +121,9 @@ router.post("/login/lender", async (req, res) => {
       // Signed in
       const user = userCredential.user;
       // ...
-      const accessToken = jwt.sign(
-        { uid: user.uid },
-        process.env.JWT_SECRET_KEY,
-        { expiresIn: "30m" }
-      );
+      const accessToken = generateJWT(user.uid,"30m")
 
-      const refreshToken = jwt.sign(
-        { uid: user.uid },
-        process.env.JWT_SECRET_KEY,
-        { expiresIn: "30d" }
-      );
+      const refreshToken = generateJWT(user.uid,"30d")
 
       // Set refresh token in an HTTP-only and secure cookie
       res.cookie("refreshToken", refreshToken, {
@@ -146,7 +138,6 @@ router.post("/login/lender", async (req, res) => {
       res.status(200).json({ message: "User logged in successfully", user });
     })
     .catch((error) => {
-      const errorCode = error.code;
       const errorMessage = error.message;
       res.status(500).send(errorMessage);
     });
@@ -162,17 +153,9 @@ router.post("/login/borrower", async (req, res) => {
       const user = userCredential.user;
       // console.log(user);
       // ...
-      const refreshToken = jwt.sign(
-        { uid: user.uid },
-        process.env.JWT_SECRET_KEY,
-        { expiresIn: "30d" }
-      );
-      const accessToken = jwt.sign(
-        { uid: user.uid },
-        process.env.JWT_SECRET_KEY,
-        { expiresIn: "30m" }
-      );
+      const accessToken = generateJWT(user.uid,"30m")
 
+      const refreshToken = generateJWT(user.uid,"30d")
       // Set refresh token in an HTTP-only and secure cookie
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
