@@ -7,6 +7,7 @@ import { auth } from "../config/firebase-config.js";
 import { Lender } from "../models/Lender.js";
 import { Borrower } from "../models/Borrower.js";
 import bcrypt from "bcrypt";
+import verifyToken from "../middleware/authencate.js";
 
 const router = Router();
 
@@ -123,13 +124,15 @@ router.post("/login/lender", async (req, res) => {
 });
 router.post("/login/borrower", async (req, res) => {
   const { email, password } = req.body;
+  console.log(email,password)
 
   signInWithEmailAndPassword(auth, email, password)
     .then((userCredential) => {
       // Signed in
       const user = userCredential.user;
+      console.log(user);
       // ...
-      res.send(user);
+      res.status(200).json(user);
     })
     .catch((error) => {
       const errorCode = error.code;
@@ -139,9 +142,9 @@ router.post("/login/borrower", async (req, res) => {
 });
 
 // GET - HOME_ROUTE
-router.route("/lenderhome").get(async (req, res) => {
+router.route("/lenderhome").get(verifyToken,async (req, res) => {
   try {
-    return res.status(200).send("Welcome to Lender Home");
+    return res.status(200).send("Welcome to Lender Home",req.user);
   } catch (e) {
     console.log(e);
     res
@@ -149,9 +152,9 @@ router.route("/lenderhome").get(async (req, res) => {
       .json({ message: "Internal Server Error", error: e.message });
   }
 });
-router.route("/borrowerhome").get(async (req, res) => {
+router.route("/borrowerhome").get(verifyToken,async (req, res) => {
   try {
-    return res.status(200).send("Welcome to Borrower Home");
+    return res.status(200).send("Welcome to Borrower Home",req.user);
   } catch (e) {
     console.log(e);
     res
