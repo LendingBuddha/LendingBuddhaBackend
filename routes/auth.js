@@ -6,9 +6,16 @@ import {
 import { auth } from "../config/firebase-config.js";
 import { Lender } from "../models/Lender.js";
 import { Borrower } from "../models/Borrower.js";
+import jwt from 'jsonwebtoken'
 import bcrypt from "bcrypt";
 
 const router = Router();
+
+const jwtsecret=process.env.JWT_SECRET_KEY;
+
+const generateJWT = (uid) => {
+  return jwt.sign({ uid }, jwtsecret, { expiresIn: '60d' });
+};
 
 
 //POST - Register new user
@@ -113,7 +120,12 @@ router.post("/login/lender", async (req, res) => {
       // Signed in
       const user = userCredential.user;
       // ...
-      res.send(user);
+      const jwtToken = generateJWT(user.uid);
+      res.setHeader('Authorization', ` Bearer ${jwtToken}`);
+      res.json({
+         user:user,
+         accessToken:jwtToken
+      })
     })
     .catch((error) => {
       const errorCode = error.code;
@@ -121,6 +133,7 @@ router.post("/login/lender", async (req, res) => {
       res.status(errorCode).send(errorMessage);
     });
 });
+
 router.post("/login/borrower", async (req, res) => {
   const { email, password } = req.body;
 
@@ -129,14 +142,22 @@ router.post("/login/borrower", async (req, res) => {
       // Signed in
       const user = userCredential.user;
       // ...
-      res.send(user);
-    })
+
+      const jwtToken = generateJWT(user.uid);
+      res.setHeader('Authorization', ` Bearer ${jwtToken}`);
+      res.json({
+         user:user,
+         accessToken:jwtToken
+      }) 
+       })
+
     .catch((error) => {
       const errorCode = error.code;
       const errorMessage = error.message;
       res.status(errorCode).send(errorMessage);
     });
 });
+
 
 // GET - HOME_ROUTE
 router.route("/lenderhome").get(async (req, res) => {
@@ -149,6 +170,7 @@ router.route("/lenderhome").get(async (req, res) => {
       .json({ message: "Internal Server Error", error: e.message });
   }
 });
+
 router.route("/borrowerhome").get(async (req, res) => {
   try {
     return res.status(200).send("Welcome to Borrower Home");
