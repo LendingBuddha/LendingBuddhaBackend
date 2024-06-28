@@ -15,8 +15,10 @@ import jwt from 'jsonwebtoken'
 import bcrypt from "bcrypt";
 import ImageKit from "imagekit";
 import { promises as fsPromises } from "fs";
-import dotenv from "dotenv";
+import verifyToken from "../middleware/authencate.js";
+import dotenv from 'dotenv';
 dotenv.config();
+
 const imagekit = new ImageKit({
   publicKey: process.env.PUBLIC_KEY,
   privateKey: process.env.PRIVATE_KEY,
@@ -37,8 +39,8 @@ async function uploadImage(filePath) {
     console.log({ message: error.message });
   }
 }
-import verifyToken from "../middleware/authencate.js";
-import checkUserInLenderSchema from "../middleware/lenderChecker.js";
+
+
 
 
 const router = Router();
@@ -77,8 +79,8 @@ router.post("/signup/lender", async (req, res) => {
     const hashPan = await bcrypt.hash(pancard, 10);
     const hashAadhar = await bcrypt.hash(aadharcard, 10);
 
-    console.log("PanCard \t ", hashPan);
-    console.log("Aadhar \t ", hashAadhar);
+    // console.log("PanCard \t ", hashPan);
+    // console.log("Aadhar \t ", hashAadhar);
 
     const Lenderuser = await Lender.create({
       email,
@@ -106,7 +108,7 @@ router.post("/signup/lender", async (req, res) => {
   }
 });
 router.post("/signup/borrower", async (req, res) => {
-  const { fullname, email, password, dob, pancard, aadharcard, phonenumber,profilePic } =
+  const { fullname, email, password, dob, pancard, aadharcard, phonenumber, profilePic } =
     req.body;
   try {
 
@@ -123,8 +125,8 @@ router.post("/signup/borrower", async (req, res) => {
     const hashPan = await bcrypt.hash(pancard, 10);
     const hashAadhar = await bcrypt.hash(aadharcard, 10);
 
-    console.log("PanCard \t ", hashPan);
-    console.log("Aadhar \t ", hashAadhar);
+    // console.log("PanCard \t ", hashPan);
+    // console.log("Aadhar \t ", hashAadhar);
 
     const borrowerUser = await Borrower.create({
       email,
@@ -135,7 +137,7 @@ router.post("/signup/borrower", async (req, res) => {
       aadharCard: hashAadhar,
       aadharCard: hashAadhar,
       uid: user.uid,
-      profilePic:result.url
+      profilePic: result.url
     });
 
     const createdUser = await Borrower.findById(borrowerUser._id).select(
@@ -391,7 +393,7 @@ router.route("/account-deatils-update").patch(verifyToken, async (req, res) => {
       res.status(200).json(lender, "Email and name update sucessfully")
     }
 
-    
+
   } catch (error) {
     res.send(error)
   }
