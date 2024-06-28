@@ -36,6 +36,9 @@ const LenderSchema = new Schema(
     refreshToken: {
       type: String,
     },
+    profilePic:{
+      type:String
+    }
   },
   {
     timestamps: true,
