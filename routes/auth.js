@@ -13,6 +13,30 @@ import { Lender } from "../models/Lender.js";
 import { Borrower } from "../models/Borrower.js";
 import jwt from 'jsonwebtoken'
 import bcrypt from "bcrypt";
+import ImageKit from "imagekit";
+import { promises as fsPromises } from "fs";
+import dotenv from "dotenv";
+dotenv.config();
+const imagekit = new ImageKit({
+  publicKey: process.env.PUBLIC_KEY,
+  privateKey: process.env.PRIVATE_KEY,
+  urlEndpoint: process.env.URL_ENDPOINT,
+});
+
+async function uploadImage(filePath) {
+  try {
+    const data = await fsPromises.readFile(filePath);
+    let base64data = Buffer.from(data).toString("base64");
+
+    const result = await imagekit.upload({
+      file: base64data,
+      fileName: "Image",
+    });
+    return result;
+  } catch (error) {
+    console.log({ message: error.message });
+  }
+}
 import verifyToken from "../middleware/authencate.js";
 import checkUserInLenderSchema from "../middleware/lenderChecker.js";
 
@@ -27,8 +51,16 @@ const generateJWT = (uid, type, time) => {
 
 //POST - Register new user
 router.post("/signup/lender", async (req, res) => {
-  const { fullname, email, password, dob, pancard, aadharcard, phonenumber } =
-    req.body;
+  const {
+    fullname,
+    email,
+    password,
+    dob,
+    pancard,
+    aadharcard,
+    phonenumber,
+    profilePic,
+  } = req.body;
   try {
     const LenderUser = await Lender.findOne({ email });
 
@@ -41,6 +73,7 @@ router.post("/signup/lender", async (req, res) => {
     );
     const user = userCredential.user;
 
+    const result = await uploadImage(profilePic);
     const hashPan = await bcrypt.hash(pancard, 10);
     const hashAadhar = await bcrypt.hash(aadharcard, 10);
 
@@ -55,6 +88,7 @@ router.post("/signup/lender", async (req, res) => {
       panCard: hashPan,
       aadharCard: hashAadhar,
       uid: user.uid,
+      profilePic: result.url,
     });
 
     const createdUser = await Lender.findById(Lenderuser._id).select(
@@ -72,9 +106,10 @@ router.post("/signup/lender", async (req, res) => {
   }
 });
 router.post("/signup/borrower", async (req, res) => {
-  const { fullname, email, password, dob, pancard, aadharcard, phonenumber } =
+  const { fullname, email, password, dob, pancard, aadharcard, phonenumber,profilePic } =
     req.body;
   try {
+
     const BorrowerUser = await Borrower.findOne({ email });
     if (BorrowerUser) return res.send("User Exists");
 
@@ -84,6 +119,7 @@ router.post("/signup/borrower", async (req, res) => {
       password
     );
     const user = userCredential.user;
+    const result = await uploadImage(profilePic);
     const hashPan = await bcrypt.hash(pancard, 10);
     const hashAadhar = await bcrypt.hash(aadharcard, 10);
 
@@ -97,7 +133,9 @@ router.post("/signup/borrower", async (req, res) => {
       dateOfBirth: dob,
       panCard: hashPan,
       aadharCard: hashAadhar,
+      aadharCard: hashAadhar,
       uid: user.uid,
+      profilePic:result.url
     });
 
     const createdUser = await Borrower.findById(borrowerUser._id).select(

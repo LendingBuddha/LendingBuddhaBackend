@@ -36,6 +36,7 @@ const BorrowerSchema = new Schema(
     refreshToken: {
       type: String,
     },
+    profilePic:{type:String}
   },
   {
     timestamps: true,
