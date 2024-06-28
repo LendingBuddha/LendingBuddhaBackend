@@ -17,6 +17,7 @@ import ImageKit from "imagekit";
 import { promises as fsPromises } from "fs";
 import verifyToken from "../middleware/authencate.js";
 import dotenv from 'dotenv';
+import { upload } from "../middleware/multer.js";
 dotenv.config();
 
 const imagekit = new ImageKit({
@@ -27,6 +28,7 @@ const imagekit = new ImageKit({
 
 async function uploadImage(filePath) {
   try {
+    if (!filePath) return "Could Not find the path ";
     const data = await fsPromises.readFile(filePath);
     let base64data = Buffer.from(data).toString("base64");
 
@@ -34,14 +36,12 @@ async function uploadImage(filePath) {
       file: base64data,
       fileName: "Image",
     });
+    fs.unlinkSync(filePath);
     return result;
   } catch (error) {
     console.log({ message: error.message });
   }
 }
-
-
-
 
 const router = Router();
 
@@ -52,7 +52,7 @@ const generateJWT = (uid, type, time) => {
 };
 
 //POST - Register new user
-router.post("/signup/lender", async (req, res) => {
+router.post("/signup/lender", upload.single("profilePic"),async (req, res) => {
   const {
     fullname,
     email,
@@ -107,7 +107,7 @@ router.post("/signup/lender", async (req, res) => {
     res.status(500).send({ error: error.message });
   }
 });
-router.post("/signup/borrower", async (req, res) => {
+router.post("/signup/borrower", upload.single("profilePic"),async (req, res) => {
   const { fullname, email, password, dob, pancard, aadharcard, phonenumber, profilePic } =
     req.body;
   try {
