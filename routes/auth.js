@@ -1,7 +1,12 @@
 import { Router } from "express";
 import {
+  EmailAuthProvider,
   createUserWithEmailAndPassword,
+  getAuth,
+  reauthenticateWithCredential,
   signInWithEmailAndPassword,
+  updateEmail,
+  updatePassword,
 } from "firebase/auth";
 import { auth } from "../config/firebase-config.js";
 import { Lender } from "../models/Lender.js";
@@ -9,14 +14,15 @@ import { Borrower } from "../models/Borrower.js";
 import jwt from 'jsonwebtoken'
 import bcrypt from "bcrypt";
 import verifyToken from "../middleware/authencate.js";
+import checkUserInLenderSchema from "../middleware/lenderChecker.js";
 
 
 const router = Router();
 
-const jwtsecret=process.env.JWT_SECRET_KEY;
+const jwtsecret = process.env.JWT_SECRET_KEY;
 
-const generateJWT = (uid,time) => {
-  return jwt.sign({ uid:uid }, jwtsecret, { expiresIn: `${time}` });
+const generateJWT = (uid, type, time) => {
+  return jwt.sign({ uid: uid, type: type }, jwtsecret, { expiresIn: `${time}` });
 };
 
 //POST - Register new user
@@ -121,9 +127,9 @@ router.post("/login/lender", async (req, res) => {
       // Signed in
       const user = userCredential.user;
       // ...
-      const accessToken = generateJWT(user.uid,"30m")
+      const accessToken = generateJWT(user.uid, "lender", "30m")
 
-      const refreshToken = generateJWT(user.uid,"30d")
+      const refreshToken = generateJWT(user.uid, "lender", "30d")
 
       // Set refresh token in an HTTP-only and secure cookie
       res.cookie("refreshToken", refreshToken, {
@@ -153,9 +159,9 @@ router.post("/login/borrower", async (req, res) => {
       const user = userCredential.user;
       // console.log(user);
       // ...
-      const accessToken = generateJWT(user.uid,"30m")
+      const accessToken = generateJWT(user.uid, "borrower", "30m")
 
-      const refreshToken = generateJWT(user.uid,"30d")
+      const refreshToken = generateJWT(user.uid, "borrower", "30d")
       // Set refresh token in an HTTP-only and secure cookie
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
@@ -239,5 +245,147 @@ router.route("/refresh-token").post(verifyToken, async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+
+
+//CRUD Opeartion's
+
+router.route("/passwordchange").post(verifyToken, async (req, res) => {
+  const { password, confirmpassword } = req.body
+  const auth = getAuth();
+  console.log(auth);
+  const user = auth.currentUser;
+  console.log(user);
+  if (password !== confirmpassword) {
+    res.status(400).json({ error: "Passwords do not match" });
+  }
+  const credential = EmailAuthProvider.credential(user.email, currentPassword);
+
+  reauthenticateWithCredential(user, credential).then(() => {
+    // If reauthentication is successful, update the password
+    return updatePassword(user, password);
+  }).then(() => {
+    res.status(200).json({ message: "Password updated successfully!" });
+  }).catch((error) => {
+    console.error("Error updating password:", error);
+  });
+});
+
+router.route("/account-deatils-update").patch(verifyToken, async (req, res) => {
+  try {
+    const { name, email, } = req.body
+    const userType = req.user.type
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (userType == "borrower") {
+      if (user) {
+        updateEmail(user, email).then(() => {
+          res.status(200).json("Email updated successfully!");
+          user.sendEmailVerification().then(() => {
+            res.status(200).json(`Verification email sent to your ${email}`);
+          }).catch((error) => {
+            res.status(503).json("Error sending verification email:", error);
+          });
+        }).catch((error) => {
+          res.status(503).json("Error updating email:", error);
+        });
+      } else {
+        res.status(401).json("User is not authenticated");
+      }
+
+      const borrower = await Borrower.findOne(req.user.uid);
+
+      if (!borrower) {
+        return res.status(404).send('Lender not found');
+      }
+      // Update both name and email if provided in the request
+      if (name) {
+        borrower.fullname = name;
+      }
+      if (email) {
+        borrower.email = email;
+      }
+
+      // Save the updated lender
+      await borrower.save();
+      const updateDetails = await Borrower.findById(borrower._id).select("-password -panCard -aadharCard -refreshToken")
+
+      if (!updateDetails) {
+        res.status(500).json("Internal Server Error")
+      }
+      res.status(200).json(borrower, "Email and name update sucessfully")
+    }
+    if (userType == "lender") {
+      if (user) {
+        updateEmail(user, email).then(() => {
+          res.status(200).json("Email updated successfully!");
+          user.sendEmailVerification().then(() => {
+            res.status(200).json(`Verification email sent to your ${email}`);
+          }).catch((error) => {
+            res.status(503).json("Error sending verification email:", error);
+          });
+        }).catch((error) => {
+          res.status(503).json("Error updating email:", error);
+        });
+      } else {
+        res.status(401).json("User is not authenticated");
+      }
+
+      const lender = await Lender.findOne(req.user.uid);
+
+      if (!lender) {
+        return res.status(404).send('Lender not found');
+      }
+      // Update both name and email if provided in the request
+      if (name) {
+        lender.fullname = name;
+      }
+      if (email) {
+        lender.email = email;
+      }
+
+      // Save the updated lender
+      await lender.save();
+      const updateDetails = await Lender.findById(lender._id).select("-password -panCard -aadharCard -refreshToken")
+
+      if (!updateDetails) {
+        res.status(500).json("Internal Server Error")
+      }
+      res.status(200).json(lender, "Email and name update sucessfully")
+    }
+
+    
+  } catch (error) {
+    res.send(error)
+  }
+
+}
+)
+
+router.route('/current-user/:id').get(verifyToken, async (req, res) => {
+  const userId = req.params.id;
+  const userType = req.user.type; // Assuming you have a way to determine user type (lender or borrower)
+
+  try {
+    let userData;
+
+    if (userType === 'lender') {
+      userData = await Lender.findOne(userId);
+    } else if (userType === 'borrower') {
+      userData = await Borrower.findOne(userId);
+    } else {
+      return res.status(400).json({ error: 'Invalid user type' });
+    }
+
+    if (!userData) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.status(200).json(userData);
+  } catch (error) {
+    console.error('Error fetching user data:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 
 export default router;
