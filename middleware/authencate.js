@@ -1,4 +1,5 @@
-
+import { Lender } from "../models/Lender.js";
+import { Borrower } from "../models/Borrower.js";
 // This Method for Firebase Token Authnetication
 
 
@@ -43,5 +44,45 @@ const verifyToken = async (req, res, next) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
   };
-  
-  export default verifyToken
+   
+  //verify isLender 
+
+  const isLender=async (req,res,next)=>{
+    try {
+       const lender=await Lender.findById(req.user.uid)
+       if(!lender){
+          return res.status(404).json({error : "Lender Not Found"})
+       }
+
+       if(lender.role != 'lender'){
+        return res.status(403).json({error : "Forbiden Lender Not Found"})
+       }
+       req.lender=lender;
+       next();
+    } catch (error) {
+      return res.status(500).json({ error: 'Server Error' });
+    }
+}
+
+// verify is borrower
+
+const isBorrower=async (req,res,next)=>{
+  try {
+     const borrower=await Borrower.findById(req.user.uid)
+     if(!borrower){
+        return res.status(404).json({error : "Borrower Not Found"})
+     }
+
+     if(borrower.role != 'borrower'){
+      return res.status(403).json({error : "Forbiden Borrower Not Found"})
+     }
+     req.borrower=borrower;
+     next();
+  } catch (error) {
+    return res.status(500).json({ error: 'Server Error' });
+  }
+}
+
+
+
+  module.exports={ verifyToken , isLender,isBorrower}

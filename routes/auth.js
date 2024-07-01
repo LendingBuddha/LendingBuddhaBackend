@@ -8,20 +8,28 @@ import { Lender } from "../models/Lender.js";
 import { Borrower } from "../models/Borrower.js";
 import jwt from 'jsonwebtoken'
 import bcrypt from "bcrypt";
-import verifyToken from "../middleware/authencate.js";
+import {verifyToken,isLender,isBorrower} from "../middleware/authencate.js";
+
 
 const router = Router();
 
 const jwtsecret=process.env.JWT_SECRET_KEY;
 
 const generateJWT = (uid) => {
-  return jwt.sign({ uid }, jwtsecret, { expiresIn: '60d' });
+  return jwt.sign({ uid }, jwtsecret, { expiresIn: '70d' });
 };
+
+function generateRefreshToken(uid) {
+  const refreshToken = jwt.sign({ uid }, process.env.REFRESH_TOKEN_SECRET, {
+      expiresIn: '7d' // Adjust the expiration as needed
+  });
+  return refreshToken;
+}
 
 
 //POST - Register new user
 router.post("/signup/lender", async (req, res) => {
-  const { fullname, email, password, dob, pancard, aadharcard, phonenumber } =
+  const { fullname, email, password, dob, pancard, aadharcard, phonenumber,role } =
     req.body;
   try {
     const LenderUser = await Lender.findOne({ email });
@@ -48,6 +56,7 @@ router.post("/signup/lender", async (req, res) => {
       dateOfBirth: dob,
       panCard: hashPan,
       aadharCard: hashAadhar,
+      role,
       uid: user.uid,
     });
 
@@ -66,7 +75,7 @@ router.post("/signup/lender", async (req, res) => {
   }
 });
 router.post("/signup/borrower", async (req, res) => {
-  const { fullname, email, password, dob, pancard, aadharcard, phonenumber } =
+  const { fullname, email, password, dob, pancard, aadharcard, phonenumber,role } =
     req.body;
   try {
     const BorrowerUser = await Borrower.findOne({ email });
@@ -91,6 +100,7 @@ router.post("/signup/borrower", async (req, res) => {
       dateOfBirth: dob,
       panCard: hashPan,
       aadharCard:hashAadhar,
+      role,
       uid: user.uid,
     });
 
@@ -127,6 +137,7 @@ router.post("/login/lender", async (req, res) => {
          user:user,
          accessToken:jwtToken
       })
+
     })
     .catch((error) => {
       const errorCode = error.code;
@@ -163,7 +174,7 @@ router.post("/login/borrower", async (req, res) => {
 
 
 // GET - HOME_ROUTE
-router.route("/lenderhome").get(verifyToken,async (req, res) => {
+router.route("/lenderhome").get(verifyToken,isLender,async (req, res) => {
   try {
     return res.status(200).send("Welcome to Lender Home",req.user);
   } catch (e) {
@@ -174,7 +185,7 @@ router.route("/lenderhome").get(verifyToken,async (req, res) => {
   }
 });
 
-router.route("/borrowerhome").get(async (req, res) => {
+router.route("/borrowerhome").get(verifyToken,isBorrower,async (req, res) => {
   try {
     return res.status(200).send("Welcome to Borrower Home",req.user);
   } catch (e) {

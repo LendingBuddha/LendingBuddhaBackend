@@ -9,7 +9,8 @@ const LenderSchema = new Schema({
     panCard: { type: String, required: true, unique: true },
     aadharCard: { type: String, required: true, unique: true },
     dateOfBirth: { type: Date, required: true },
-    profilePic:{type:String, default: ""},
+    profilePic: { type: String, default: "" },
+    role: {type: String,default: 'lender' },
 
 }, { timestamps: true });
 
