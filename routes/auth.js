@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   EmailAuthProvider,
   createUserWithEmailAndPassword,
+  deleteUser,
   getAuth,
   reauthenticateWithCredential,
   signInWithEmailAndPassword,
@@ -52,7 +53,7 @@ const generateJWT = (uid, type, time) => {
 };
 
 //POST - Register new user
-router.post("/signup/lender", upload.single("profilePic"),async (req, res) => {
+router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
   const {
     fullname,
     email,
@@ -107,7 +108,7 @@ router.post("/signup/lender", upload.single("profilePic"),async (req, res) => {
     res.status(500).send({ error: error.message });
   }
 });
-router.post("/signup/borrower", upload.single("profilePic"),async (req, res) => {
+router.post("/signup/borrower", upload.single("profilePic"), async (req, res) => {
   const { fullname, email, password, dob, pancard, aadharcard, phonenumber, profilePic } =
     req.body;
   try {
@@ -191,7 +192,7 @@ router.post("/login/lender", async (req, res) => {
 
 router.post("/login/borrower", async (req, res) => {
   const { email, password } = req.body;
-  console.log(email, password);
+  // console.log(email, password);
 
   signInWithEmailAndPassword(auth, email, password)
     .then((userCredential) => {
@@ -225,10 +226,14 @@ router.post("/login/borrower", async (req, res) => {
 // GET - HOME_ROUTE
 router.route("/lenderhome").get(verifyToken, async (req, res) => {
   try {
-    return res.status(200).json({
-      message: "Welcome to Protected Route of Lender Home",
-      data: req.user.uid,
-    });
+    if (req.user.type === "lender") {
+      return res.status(200).json({
+        message: "Welcome to Protected Route of Lender Home",
+        data: req.user.uid,
+      });
+    } else {
+      return res.status(401).send("Your are not Lender ")
+    }
   } catch (e) {
     console.log(e);
     res
@@ -238,10 +243,14 @@ router.route("/lenderhome").get(verifyToken, async (req, res) => {
 });
 router.route("/borrowerhome").get(verifyToken, async (req, res) => {
   try {
-    return res.status(200).json({
-      message: "Welcome to Protected Route of Borrower Home",
-      data: req.user.uid,
-    });
+    if (req.user.type === "borrower") {
+      return res.status(200).json({
+        message: "Welcome to Protected Route of Borrower Home",
+        data: req.user.uid,
+      })
+    } else {
+      return res.status(401).send("Your are not Borrower ")
+    }
   } catch (e) {
     console.log(e);
     res.json({ message: "Internal Server Error", error: e.message });
@@ -403,8 +412,7 @@ router.route("/account-deatils-update").patch(verifyToken, async (req, res) => {
 
 router.route('/current-user/:id').get(verifyToken, async (req, res) => {
   const userId = req.params.id;
-  const userType = req.user.type; // Assuming you have a way to determine user type (lender or borrower)
-
+  const userType = req.user.type;
   try {
     let userData;
 
@@ -427,5 +435,59 @@ router.route('/current-user/:id').get(verifyToken, async (req, res) => {
   }
 });
 
+router.route('/delete-user/:id').delete(verifyToken, async (req, res) => {
+  const userId = req.params.id;
+  const userType = req.user.type;
+
+  try {
+    if (userType === "lender") {
+      await Lender.findByIdAndDelete(userId)
+      await deleteUser(req.user.uid)
+      res.status(200).json(`Successfully deleted Lender with UID: ${req.user.uid}`)
+    } else if (userType === "borrower") {
+      await Borrower.findByIdAndDelete(userId)
+      await deleteUser(req.user.uid)
+      res.status(200).json(`Successfully deleted Borrower with UID: ${req.user.uid}`)
+    } else {
+      res.status(200).json("You are not Lender or Borrower")
+    }
+
+  } catch (error) {
+    console.log(error)
+    res.status(500).json("Internal Server Error")
+  }
+})
+
+// Logout Route
+
+router.route("/logout").get(verifyToken, async (req, res) => {
+
+  if (req.user.type === "lender") {
+    await Lender.findOneAndUpdate(req.user.uid, {
+      $unset: {
+        refreshToken: 1
+      }
+    }, {
+      new: true
+    })
+  }
+  else if(req.user.type==="borrower"){
+    await Borrower.findOneAndUpdate(req.user.uid, {
+      $unset: {
+        refreshToken: 1
+      }
+    }, {
+      new: true
+    })
+  }
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+  return res
+    .status(200)
+    .clearCookie("refreshToken", options)
+    .json("User logout Successfully....");
+})
 
 export default router;

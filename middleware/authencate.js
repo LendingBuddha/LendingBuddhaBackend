@@ -35,12 +35,18 @@ const verifyToken = async (req, res, next) => {
     try {
       // Verify token
       const decoded = jwt.verify(idToken, process.env.JWT_SECRET_KEY);
+      console.log(decoded);
       req.user = decoded;
       next(); 
     } catch (err) {
       // Handle verification errors
-      console.error('Error verifying token:', err);
-      return res.status(403).json({ error: 'Forbidden' });
+      if (err.name === 'TokenExpiredError') {
+        console.error('Token expired:', err);
+        return res.status(401).json({ error: 'TokenExpired' });
+      } else {
+        console.error('Error verifying token:', err);
+        return res.status(403).json({ error: 'Forbidden' });
+      }
     }
   };
   
