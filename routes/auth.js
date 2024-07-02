@@ -1,13 +1,7 @@
 import { Router } from "express";
 import {
-  EmailAuthProvider,
   createUserWithEmailAndPassword,
-  deleteUser,
-  getAuth,
-  reauthenticateWithCredential,
   signInWithEmailAndPassword,
-  updateEmail,
-  updatePassword,
 } from "firebase/auth";
 import { auth } from "../config/firebase-config.js";
 import { Lender } from "../models/Lender.js";
@@ -19,6 +13,7 @@ import { promises as fsPromises } from "fs";
 import verifyToken from "../middleware/authencate.js";
 import { upload } from "../middleware/multer.js";
 import admin from "../config/firebase-admin.mjs";
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
 
 const imagekit = new ImageKit({
@@ -62,13 +57,16 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
     pancard,
     aadharcard,
     phonenumber,
-    profilePic,
   } = req.body;
+  const profilePic = req.file.path
+  console.log(profilePic)
+  if(!profilePic){
+    res.status(404).json("Profile Pic Path Is Not Valid")
+  }
   try {
     const LenderUser = await Lender.findOne({ email });
 
     if (LenderUser) return res.send("User Exists");
-
     const userCredential = await createUserWithEmailAndPassword(
       auth,
       email,
@@ -77,8 +75,8 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
     const user = userCredential.user;
 
     const result = await uploadImage(profilePic);
-    const hashPan = await bcrypt.hash(pancard, 10);
-    const hashAadhar = await bcrypt.hash(aadharcard, 10);
+    console.log(result);
+  
 
     // console.log("PanCard \t ", hashPan);
     // console.log("Aadhar \t ", hashAadhar);
@@ -88,10 +86,10 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
       fullname,
       phoneNumber: phonenumber,
       dateOfBirth: dob,
-      panCard: hashPan,
-      aadharCard: hashAadhar,
+      panCard: pancard,
+      aadharCard: aadharcard,
       uid: user.uid,
-      profilePic: result.url,
+      profilePic: result.url
     });
 
     const createdUser = await Lender.findById(Lenderuser._id).select(
@@ -109,8 +107,14 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
   }
 });
 router.post("/signup/borrower", upload.single("profilePic"), async (req, res) => {
-  const { fullname, email, password, dob, pancard, aadharcard, phonenumber, profilePic } =
+  const { fullname, email, password, dob, pancard, aadharcard, phonenumber } =
     req.body;
+
+    const profilePic = req.file.path
+    // console.log(profilePic)
+    if(!profilePic){
+      return res.status(404).json("Path Doesn't find")
+    }
   try {
 
     const BorrowerUser = await Borrower.findOne({ email });
@@ -475,4 +479,16 @@ router.route("/logout").get(verifyToken, async (req, res) => {
   }
 })
 
+
+
+// Get ALL User 
+
+router.route("/getall-lender").get(verifyToken,async(req,res)=>{
+  const userType = req.user.type
+  let UserData 
+
+  if(userType==="lender"){
+    userData = await Borrower.find()
+  }
+})
 export default router;
