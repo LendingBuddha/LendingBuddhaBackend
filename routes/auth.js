@@ -17,9 +17,9 @@ import bcrypt from "bcrypt";
 import ImageKit from "imagekit";
 import { promises as fsPromises } from "fs";
 import verifyToken from "../middleware/authencate.js";
-import dotenv from 'dotenv';
 import { upload } from "../middleware/multer.js";
-dotenv.config();
+import admin from "../config/firebase-admin.mjs";
+
 
 const imagekit = new ImageKit({
   publicKey: process.env.PUBLIC_KEY,
@@ -46,11 +46,11 @@ async function uploadImage(filePath) {
 
 const router = Router();
 
-const jwtsecret = process.env.JWT_SECRET_KEY;
-
 const generateJWT = (uid, type, time) => {
-  return jwt.sign({ uid: uid, type: type }, jwtsecret, { expiresIn: `${time}` });
+  return jwt.sign({ uid: uid, type: type }, process.env.JWT_SECRET_KEY, { expiresIn: `${time}` });
 };
+
+
 
 //POST - Register new user
 router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
@@ -123,8 +123,7 @@ router.post("/signup/borrower", upload.single("profilePic"), async (req, res) =>
     );
     const user = userCredential.user;
     const result = await uploadImage(profilePic);
-    const hashPan = await bcrypt.hash(pancard, 10);
-    const hashAadhar = await bcrypt.hash(aadharcard, 10);
+
 
     // console.log("PanCard \t ", hashPan);
     // console.log("Aadhar \t ", hashAadhar);
@@ -134,9 +133,8 @@ router.post("/signup/borrower", upload.single("profilePic"), async (req, res) =>
       fullname,
       phoneNumber: phonenumber,
       dateOfBirth: dob,
-      panCard: hashPan,
-      aadharCard: hashAadhar,
-      aadharCard: hashAadhar,
+      panCard: pancard,
+      aadharCard: aadharcard,
       uid: user.uid,
       profilePic: result.url
     });
@@ -269,7 +267,7 @@ router.route("/").get(async (req, res) => {
 
 // UTILS ROUTES
 //for Refresh-Token
-router.route("/refresh-token").post(verifyToken, async (req, res) => {
+router.route("/refreshtoken").get(verifyToken, async (req, res) => {
   try {
     const refreshToken = req.cookies.refreshToken;
     if (!refreshToken) {
@@ -282,7 +280,7 @@ router.route("/refresh-token").post(verifyToken, async (req, res) => {
       return res.status(403).json({ error: "Invalid refresh token" });
     }
     const accessToken = jwt.sign(
-      { uid: decoded.uid },
+      { uid: decoded.uid,type:decoded.type },
       process.env.JWT_SECRET_KEY,
       { expiresIn: "60m" }
     );
@@ -300,53 +298,44 @@ router.route("/refresh-token").post(verifyToken, async (req, res) => {
 
 router.route("/passwordchange").post(verifyToken, async (req, res) => {
   const { password, confirmpassword } = req.body
-  const auth = getAuth();
-  console.log(auth);
-  const user = auth.currentUser;
-  console.log(user);
   if (password !== confirmpassword) {
     res.status(400).json({ error: "Passwords do not match" });
   }
-  const credential = EmailAuthProvider.credential(user.email, currentPassword);
+  try {
+    await admin.auth().updateUser(req.user.uid, {
+      password: password,
+    });
+    res.status(200).json('Password changed successfully');
+  } catch (error) {
+    console.error('Error changing password :', error);
+    res.status(500).json("Internal Server Error") // Handle error as needed
+  }
 
-  reauthenticateWithCredential(user, credential).then(() => {
-    // If reauthentication is successful, update the password
-    return updatePassword(user, password);
-  }).then(() => {
-    res.status(200).json({ message: "Password updated successfully!" });
-  }).catch((error) => {
-    console.error("Error updating password:", error);
-  });
 });
 
 router.route("/account-deatils-update").patch(verifyToken, async (req, res) => {
   try {
-    const { name, email, } = req.body
-    const userType = req.user.type
-    const auth = getAuth();
-    const user = auth.currentUser;
-    if (userType == "borrower") {
-      if (user) {
-        updateEmail(user, email).then(() => {
-          res.status(200).json("Email updated successfully!");
-          user.sendEmailVerification().then(() => {
-            res.status(200).json(`Verification email sent to your ${email}`);
-          }).catch((error) => {
-            res.status(503).json("Error sending verification email:", error);
-          });
-        }).catch((error) => {
-          res.status(503).json("Error updating email:", error);
-        });
-      } else {
-        res.status(401).json("User is not authenticated");
-      }
+    const { name, email } = req.body;
+    const userType = req.user.type;
+    
+    // console.log(auth);
 
-      const borrower = await Borrower.findOne(req.user.uid);
+    if (!userType) {
+      return res.status(401).json("User is not authenticated");
+    }
 
+    if (userType === "borrower") {
+      // Update email and send verification email
+      await admin.auth().updateUser(req.user.uid, {
+        email: email
+      });
+
+      const borrower = await Borrower.findOne({ uid: req.user.uid });
       if (!borrower) {
-        return res.status(404).send('Lender not found');
+        return res.status(404).json('Borrower not found');
       }
-      // Update both name and email if provided in the request
+
+      // Update borrower's name if provided
       if (name) {
         borrower.fullname = name;
       }
@@ -354,37 +343,31 @@ router.route("/account-deatils-update").patch(verifyToken, async (req, res) => {
         borrower.email = email;
       }
 
-      // Save the updated lender
       await borrower.save();
-      const updateDetails = await Borrower.findById(borrower._id).select("-password -panCard -aadharCard -refreshToken")
 
+      // Fetch updated details and send response
+      const updateDetails = await Borrower.findById(borrower._id).select("-password -panCard -aadharCard -refreshToken");
       if (!updateDetails) {
-        res.status(500).json("Internal Server Error")
+        return res.status(500).json("Internal Server Error");
       }
-      res.status(200).json(borrower, "Email and name update sucessfully")
+
+      return res.status(200).json({
+        message: "Email and name updated successfully",
+        updateDetails: updateDetails
+      });
     }
-    if (userType == "lender") {
-      if (user) {
-        updateEmail(user, email).then(() => {
-          res.status(200).json("Email updated successfully!");
-          user.sendEmailVerification().then(() => {
-            res.status(200).json(`Verification email sent to your ${email}`);
-          }).catch((error) => {
-            res.status(503).json("Error sending verification email:", error);
-          });
-        }).catch((error) => {
-          res.status(503).json("Error updating email:", error);
-        });
-      } else {
-        res.status(401).json("User is not authenticated");
-      }
 
-      const lender = await Lender.findOne(req.user.uid);
-
+    if (userType === "lender") {
+      // Update email and send verification email
+      await admin.auth().updateUser(userId, {
+        email: email
+      });
+      const lender = await Lender.findOne({ uid: req.user.uid });
       if (!lender) {
-        return res.status(404).send('Lender not found');
+        return res.status(404).json('Lender not found');
       }
-      // Update both name and email if provided in the request
+
+      // Update lender's name if provided
       if (name) {
         lender.fullname = name;
       }
@@ -392,34 +375,40 @@ router.route("/account-deatils-update").patch(verifyToken, async (req, res) => {
         lender.email = email;
       }
 
-      // Save the updated lender
       await lender.save();
-      const updateDetails = await Lender.findById(lender._id).select("-password -panCard -aadharCard -refreshToken")
 
+      // Fetch updated details and send response
+      const updateDetails = await Lender.findById(lender._id).select("-password -panCard -aadharCard -refreshToken");
       if (!updateDetails) {
-        res.status(500).json("Internal Server Error")
+        return res.status(500).json("Internal Server Error");
       }
-      res.status(200).json(lender, "Email and name update sucessfully")
+
+      return res.status(200).json({
+        message: "Email and name updated successfully",
+        updateDetails: updateDetails
+      });
     }
 
+    // Handle unexpected userType
+    return res.status(400).json("Invalid userType");
 
   } catch (error) {
-    res.send(error)
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
+})
 
-}
-)
-
-router.route('/current-user/:id').get(verifyToken, async (req, res) => {
-  const userId = req.params.id;
+router.route('/current-user').get(verifyToken, async (req, res) => {
+  const userId = req.user.uid;
   const userType = req.user.type;
+
   try {
     let userData;
 
     if (userType === 'lender') {
-      userData = await Lender.findOne(userId);
+      userData = await Lender.findOne({ uid: userId }).select('-refreshToken');
     } else if (userType === 'borrower') {
-      userData = await Borrower.findOne(userId);
+      userData = await Borrower.findOne({ uid: userId }).select('-refreshToken');
     } else {
       return res.status(400).json({ error: 'Invalid user type' });
     }
@@ -428,6 +417,8 @@ router.route('/current-user/:id').get(verifyToken, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    await userData.decryptFields();
+    console.log(userData)
     res.status(200).json(userData);
   } catch (error) {
     console.error('Error fetching user data:', error);
@@ -441,12 +432,12 @@ router.route('/delete-user/:id').delete(verifyToken, async (req, res) => {
 
   try {
     if (userType === "lender") {
-      await Lender.findByIdAndDelete(userId)
-      await deleteUser(req.user.uid)
+      await Lender.findOneAndDelete({uid:userId})
+      await admin.auth().deleteUser(userId)
       res.status(200).json(`Successfully deleted Lender with UID: ${req.user.uid}`)
     } else if (userType === "borrower") {
-      await Borrower.findByIdAndDelete(userId)
-      await deleteUser(req.user.uid)
+      await Borrower.findOneAndDelete({uid:userId})
+      await admin.auth().deleteUser(userId)
       res.status(200).json(`Successfully deleted Borrower with UID: ${req.user.uid}`)
     } else {
       res.status(200).json("You are not Lender or Borrower")
@@ -461,33 +452,27 @@ router.route('/delete-user/:id').delete(verifyToken, async (req, res) => {
 // Logout Route
 
 router.route("/logout").get(verifyToken, async (req, res) => {
+  const uid = req.user.uid;
 
-  if (req.user.type === "lender") {
-    await Lender.findOneAndUpdate(req.user.uid, {
-      $unset: {
-        refreshToken: 1
-      }
-    }, {
-      new: true
-    })
+  try {
+    if (req.user.type === "lender") {
+      await Lender.findOneAndUpdate({ uid }, { $unset: { refreshToken: 1 } }, { new: true });
+    } else if (req.user.type === "borrower") {
+      await Borrower.findOneAndUpdate({ uid }, { $unset: { refreshToken: 1 } }, { new: true });
+    } else {
+      throw new Error('Invalid user type');
+    }
+
+    const options = {
+      httpOnly: true,
+      secure: true,
+    };
+
+    res.clearCookie("refreshToken", options).json({ message: "User logged out successfully" });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ message: "Failed to logout user", error: error.message });
   }
-  else if(req.user.type==="borrower"){
-    await Borrower.findOneAndUpdate(req.user.uid, {
-      $unset: {
-        refreshToken: 1
-      }
-    }, {
-      new: true
-    })
-  }
-  const options = {
-    httpOnly: true,
-    secure: true,
-  };
-  return res
-    .status(200)
-    .clearCookie("refreshToken", options)
-    .json("User logout Successfully....");
 })
 
 export default router;
