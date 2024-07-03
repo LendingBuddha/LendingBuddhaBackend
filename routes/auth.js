@@ -1,21 +1,14 @@
 import { Router } from "express";
-import {
-  EmailAuthProvider,
-  createUserWithEmailAndPassword,
-  deleteUser,
-  getAuth,
-  reauthenticateWithCredential,
-  signInWithEmailAndPassword,
-  updateEmail,
-  updatePassword,
-} from "firebase/auth";
+import { createUserWithEmailAndPassword,
+         signInWithEmailAndPassword      
+ } from "firebase/auth";
 import { auth } from "../config/firebase-config.js";
 import { Lender } from "../models/Lender.js";
 import { Borrower } from "../models/Borrower.js";
 import jwt from 'jsonwebtoken'
 import bcrypt from "bcrypt";
 import ImageKit from "imagekit";
-import { promises as fsPromises } from "fs";
+import fs from 'fs';
 import verifyToken from "../middleware/authencate.js";
 import { upload } from "../middleware/multer.js";
 import admin from "../config/firebase-admin.mjs";
@@ -30,14 +23,14 @@ const imagekit = new ImageKit({
 async function uploadImage(filePath) {
   try {
     if (!filePath) return "Could Not find the path ";
-    const data = await fsPromises.readFile(filePath);
+    const data = await fs.promises.readFile(filePath);
     let base64data = Buffer.from(data).toString("base64");
 
     const result = await imagekit.upload({
       file: base64data,
       fileName: "Image",
     });
-    fs.unlinkSync(filePath);
+    await fs.promises.unlink(filePath);
     return result;
   } catch (error) {
     console.log({ message: error.message });
@@ -50,38 +43,26 @@ const generateJWT = (uid, type, time) => {
   return jwt.sign({ uid: uid, type: type }, process.env.JWT_SECRET_KEY, { expiresIn: `${time}` });
 };
 
-
-
 //POST - Register new user
 router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
-  const {
-    fullname,
-    email,
-    password,
-    dob,
-    pancard,
-    aadharcard,
-    phonenumber,
-    profilePic,
-  } = req.body;
+  const { fullname, email, password, dob, pancard, aadharcard, phonenumber } = req.body;
+  const profilePic = req.file.path; // Get the file path from multer
+
   try {
     const LenderUser = await Lender.findOne({ email });
 
-    if (LenderUser) return res.send("User Exists");
+    if (LenderUser) return res.status(400).send("User Exists");
 
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
     const result = await uploadImage(profilePic);
+    if (!result || !result.url) {
+      throw new Error("Image upload failed");
+    }
+
     const hashPan = await bcrypt.hash(pancard, 10);
     const hashAadhar = await bcrypt.hash(aadharcard, 10);
-
-    // console.log("PanCard \t ", hashPan);
-    // console.log("Aadhar \t ", hashAadhar);
 
     const Lenderuser = await Lender.create({
       email,
@@ -94,9 +75,7 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
       profilePic: result.url,
     });
 
-    const createdUser = await Lender.findById(Lenderuser._id).select(
-      "-panCard -aadharCard "
-    );
+    const createdUser = await Lender.findById(Lenderuser._id).select("-panCard -aadharCard");
     if (!createdUser) {
       return res.status(500).send("Internal Error!!!");
     }
@@ -105,9 +84,12 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
       data: createdUser,
     });
   } catch (error) {
+    console.error(error);
     res.status(500).send({ error: error.message });
   }
 });
+
+
 router.post("/signup/borrower", upload.single("profilePic"), async (req, res) => {
   const { fullname, email, password, dob, pancard, aadharcard, phonenumber, profilePic } =
     req.body;
