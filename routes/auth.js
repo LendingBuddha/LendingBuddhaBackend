@@ -54,6 +54,7 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
     pancard,
     aadharcard,
     phonenumber,
+    cibilscore
   } = req.body;
 
   const profilePic = req.file ? req.file.path : null;
@@ -82,6 +83,7 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
       phoneNumber: phonenumber,
       dateOfBirth: dob,
       panCard: pancard,
+      cibilScore: cibilscore,
       aadharCard: aadharcard,
       profilePic: result.url,
     });
