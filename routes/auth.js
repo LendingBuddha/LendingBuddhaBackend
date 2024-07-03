@@ -8,7 +8,7 @@ import { Lender } from "../models/Lender.js";
 import { Borrower } from "../models/Borrower.js";
 import jwt from 'jsonwebtoken'
 import ImageKit from "imagekit";
-import { promises as fsPromises } from "fs";
+import fs from 'fs';
 import verifyToken from "../middleware/authencate.js";
 import { upload } from "../middleware/multer.js";
 import admin from "../config/firebase-admin.mjs";
@@ -24,14 +24,14 @@ const imagekit = new ImageKit({
 async function uploadImage(filePath) {
   try {
     if (!filePath) return "Could Not find the path ";
-    const data = await fsPromises.readFile(filePath);
+    const data = await fs.promises.readFile(filePath);
     let base64data = Buffer.from(data).toString("base64");
 
     const result = await ImageKit.upload({
       file: base64data,
       fileName: "Image",
     });
-    fs.unlinkSync(filePath);
+    await fs.promises.unlink(filePath);
     return result;
   } catch (error) {
     console.log({ message: error.message });
@@ -44,9 +44,7 @@ const generateJWT = (uid, type, time) => {
   return jwt.sign({ uid: uid, type: type }, process.env.JWT_SECRET_KEY, { expiresIn: `${time}` });
 };
 
-
-
-//POST - Register new user
+//POST - Register new Lender
 router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
   const {
     fullname,
@@ -113,17 +111,22 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
   }
 });
 
-
+// post route Borrower
 router.post("/signup/borrower", upload.single("profilePic"), async (req, res) => {
-  const { fullname, email, password, dob, pancard, aadharcard, phonenumber } = req.body;
-  const profilePic = req.file ? req.file.path : null;
-
-  if (!profilePic) {
-    return res.status(400).json({ error: "Profile Pic is required" });
-  }
+  const {
+    fullname,
+    email,
+    password,
+    dob,
+    pancard,
+    aadharcard,
+    phonenumber,
+    cibilscore, 
+  } = req.body;
+  const profilePic = req.file; 
 
   try {
-    // Check if the user already exists in the database
+    
     const BorrowerUser = await Borrower.findOne({ email });
     if (BorrowerUser) {
       return res.status(400).json({ error: "User already exists" });
@@ -143,6 +146,8 @@ router.post("/signup/borrower", upload.single("profilePic"), async (req, res) =>
       dateOfBirth: dob,
       panCard: pancard,
       aadharCard: aadharcard,
+      cibilScore: cibilscore, 
+      uid: user.uid,
       profilePic: result.url,
     });
 
@@ -174,32 +179,28 @@ router.post("/signup/borrower", upload.single("profilePic"), async (req, res) =>
 // POST- Login user
 router.post("/login/lender", async (req, res) => {
   const { email, password } = req.body;
+  console.log('Login request received:', req.body);
 
-  signInWithEmailAndPassword(auth, email, password)
-    .then((userCredential) => {
-      // Signed in
-      const user = userCredential.user;
-      // ...
-      const accessToken = generateJWT(user.uid, "lender", "30m")
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    console.log('User signed in:', user);
 
-      const refreshToken = generateJWT(user.uid, "lender", "30d")
+    const accessToken = generateJWT(user.uid, "lender", "30m");
+    const refreshToken = generateJWT(user.uid, "lender", "30d");
 
-      // Set refresh token in an HTTP-only and secure cookie
-      res.cookie("refreshToken", refreshToken, {
-        httpOnly: true,
-        secure: true,
-        // sameSite: "strict",
-      });
-
-      res.setHeader("Authorization", `Bearer ${accessToken}`);
-
-      // Send response indicating successful login
-      res.status(200).json({ message: "User logged in successfully", user });
-    })
-    .catch((error) => {
-      const errorMessage = error.message;
-      res.status(500).send(errorMessage);
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: true,
+      // sameSite: "strict",
     });
+
+    res.setHeader("Authorization", `Bearer ${accessToken}`);
+    res.status(200).json({ message: "User logged in successfully", user });
+  } catch (error) {
+    console.error('Error during login:', error.message);
+    res.status(500).send(error.message);
+  }
 });
 
 router.post("/login/borrower", async (req, res) => {

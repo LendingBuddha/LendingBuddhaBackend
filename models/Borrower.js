@@ -37,7 +37,11 @@ const BorrowerSchema = new Schema(
     refreshToken: {
       type: String,
     },
-    profilePic:{type:String}
+    profilePic:{type:String},
+    cibilScore: {
+      type: String,
+      required: true,
+    }
   },
   {
     timestamps: true,
