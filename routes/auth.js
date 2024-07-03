@@ -7,13 +7,12 @@ import { auth } from "../config/firebase-config.js";
 import { Lender } from "../models/Lender.js";
 import { Borrower } from "../models/Borrower.js";
 import jwt from 'jsonwebtoken'
-import bcrypt from "bcrypt";
 import ImageKit from "imagekit";
 import { promises as fsPromises } from "fs";
 import verifyToken from "../middleware/authencate.js";
 import { upload } from "../middleware/multer.js";
 import admin from "../config/firebase-admin.mjs";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+
 
 
 const imagekit = new ImageKit({
@@ -28,7 +27,7 @@ async function uploadImage(filePath) {
     const data = await fsPromises.readFile(filePath);
     let base64data = Buffer.from(data).toString("base64");
 
-    const result = await imagekit.upload({
+    const result = await ImageKit.upload({
       file: base64data,
       fileName: "Image",
     });
@@ -58,29 +57,27 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
     aadharcard,
     phonenumber,
   } = req.body;
-  const profilePic = req.file.path
-  console.log(profilePic)
-  if(!profilePic){
-    res.status(404).json("Profile Pic Path Is Not Valid")
+
+  const profilePic = req.file ? req.file.path : null;
+
+  if (!profilePic) {
+    return res.status(400).json({ error: "Profile Pic is required" });
   }
+
   try {
+    // Check if the user already exists in the database
     const LenderUser = await Lender.findOne({ email });
+    if (LenderUser) {
+      return res.status(400).json({ error: "User already exists" });
+    }
 
-    if (LenderUser) return res.send("User Exists");
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
-    const user = userCredential.user;
-
+    // Upload profile picture
     const result = await uploadImage(profilePic);
-    console.log(result);
-  
+    if (!result || !result.url) {
+      return res.status(500).json({ error: "Failed to upload profile picture" });
+    }
 
-    // console.log("PanCard \t ", hashPan);
-    // console.log("Aadhar \t ", hashAadhar);
-
+    // Save user details in the database
     const Lenderuser = await Lender.create({
       email,
       fullname,
@@ -88,50 +85,57 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
       dateOfBirth: dob,
       panCard: pancard,
       aadharCard: aadharcard,
-      uid: user.uid,
-      profilePic: result.url
+      profilePic: result.url,
     });
 
+    // If database entry is successful, create user in Firebase
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+
+    // Update the database entry with the Firebase user ID
+    Lenderuser.uid = user.uid;
+    await Lenderuser.save();
+
+    // Retrieve the created user without sensitive information
     const createdUser = await Lender.findById(Lenderuser._id).select(
-      "-panCard -aadharCard "
+      "-panCard -aadharCard"
     );
     if (!createdUser) {
-      return res.status(500).send("Internal Error!!!");
+      return res.status(500).send("Internal Error");
     }
+
     res.status(201).json({
       message: "Lender User created",
       data: createdUser,
     });
   } catch (error) {
-    res.status(500).send({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
+
+
 router.post("/signup/borrower", upload.single("profilePic"), async (req, res) => {
-  const { fullname, email, password, dob, pancard, aadharcard, phonenumber } =
-    req.body;
+  const { fullname, email, password, dob, pancard, aadharcard, phonenumber } = req.body;
+  const profilePic = req.file ? req.file.path : null;
 
-    const profilePic = req.file.path
-    // console.log(profilePic)
-    if(!profilePic){
-      return res.status(404).json("Path Doesn't find")
-    }
+  if (!profilePic) {
+    return res.status(400).json({ error: "Profile Pic is required" });
+  }
+
   try {
-
+    // Check if the user already exists in the database
     const BorrowerUser = await Borrower.findOne({ email });
-    if (BorrowerUser) return res.send("User Exists");
+    if (BorrowerUser) {
+      return res.status(400).json({ error: "User already exists" });
+    }
 
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
-    const user = userCredential.user;
+    // Upload profile picture
     const result = await uploadImage(profilePic);
+    if (!result || !result.url) {
+      return res.status(500).json({ error: "Failed to upload profile picture" });
+    }
 
-
-    // console.log("PanCard \t ", hashPan);
-    // console.log("Aadhar \t ", hashAadhar);
-
+    // Save user details in the database
     const borrowerUser = await Borrower.create({
       email,
       fullname,
@@ -139,15 +143,23 @@ router.post("/signup/borrower", upload.single("profilePic"), async (req, res) =>
       dateOfBirth: dob,
       panCard: pancard,
       aadharCard: aadharcard,
-      uid: user.uid,
-      profilePic: result.url
+      profilePic: result.url,
     });
 
+    // If database entry is successful, create user in Firebase
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+
+    // Update the database entry with the Firebase user ID
+    borrowerUser.uid = user.uid;
+    await borrowerUser.save();
+
+    // Retrieve the created user without sensitive information
     const createdUser = await Borrower.findById(borrowerUser._id).select(
-      "-panCard -aadharCard "
+      "-panCard -aadharCard"
     );
     if (!createdUser) {
-      return res.status(500).send("Internal Error!!!");
+      return res.status(500).send("Internal Error");
     }
 
     res.status(201).json({
@@ -155,9 +167,7 @@ router.post("/signup/borrower", upload.single("profilePic"), async (req, res) =>
       data: createdUser,
     });
   } catch (error) {
-    const errorCode = error.code;
-    const errorMessage = error.message;
-    res.status(500).send({ error: errorMessage });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -194,17 +204,14 @@ router.post("/login/lender", async (req, res) => {
 
 router.post("/login/borrower", async (req, res) => {
   const { email, password } = req.body;
-  // console.log(email, password);
 
   signInWithEmailAndPassword(auth, email, password)
     .then((userCredential) => {
       // Signed in
       const user = userCredential.user;
-      // console.log(user);
-      // ...
       const accessToken = generateJWT(user.uid, "borrower", "30m")
-
       const refreshToken = generateJWT(user.uid, "borrower", "30d")
+
       // Set refresh token in an HTTP-only and secure cookie
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
@@ -215,10 +222,13 @@ router.post("/login/borrower", async (req, res) => {
       res.setHeader("Authorization", `Bearer ${accessToken}`);
 
       // Send response indicating successful login
-      res.status(200).json({ message: "User logged in successfully", user });
+      res.status(200).json({ message: "User logged in successfully", user: {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+      }, });
     })
     .catch((error) => {
-      const errorCode = error.code;
       const errorMessage = error.message;
       res.status(500).send(errorMessage);
     });
@@ -274,133 +284,126 @@ router.route("/").get(async (req, res) => {
 router.route("/refreshtoken").get(verifyToken, async (req, res) => {
   try {
     const refreshToken = req.cookies.refreshToken;
+
     if (!refreshToken) {
-      return res.status(401).send("No Refresh Token in Cookies");
+      return res.status(401).json({ error: "No Refresh Token in Cookies" });
     }
+
     // Verify refresh token
     const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET_KEY);
-    // Check if token verification failed
-    if (!decoded) {
-      return res.status(403).json({ error: "Invalid refresh token" });
-    }
+
+    // Generate new access token
     const accessToken = jwt.sign(
-      { uid: decoded.uid,type:decoded.type },
+      { uid: decoded.uid, type: decoded.type },
       process.env.JWT_SECRET_KEY,
       { expiresIn: "60m" }
     );
+
+    // Set the new access token in the Authorization header
     res.setHeader("Authorization", `Bearer ${accessToken}`);
 
-    res.json({ accessToken });
+    // Send the new access token in the response
+    res.status(200).json({ accessToken });
   } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      res.clearCookie("refreshToken", {
+        httpOnly: true,
+        secure: true,
+        sameSite: "strict",
+      });
+      return res.status(403).json({ error: "Refresh token expired" });
+    } else if (error.name === 'JsonWebTokenError') {
+      return res.status(403).json({ error: "Invalid refresh token" });
+    }
+
     console.error("Error refreshing token:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
 
-
 //CRUD Opeartion's
 
 router.route("/passwordchange").post(verifyToken, async (req, res) => {
-  const { password, confirmpassword } = req.body
-  if (password !== confirmpassword) {
-    res.status(400).json({ error: "Passwords do not match" });
+  const { password, confirmPassword } = req.body;
+
+  // Check if passwords match
+  if (password !== confirmPassword) {
+    return res.status(400).json({ error: "Passwords do not match" });
   }
+
   try {
+    // Update password in Firebase Auth
     await admin.auth().updateUser(req.user.uid, {
       password: password,
     });
-    res.status(200).json('Password changed successfully');
-  } catch (error) {
-    console.error('Error changing password :', error);
-    res.status(500).json("Internal Server Error") // Handle error as needed
-  }
 
+    // Respond with success message
+    res.status(200).json({ message: "Password changed successfully" });
+  } catch (error) {
+    // Handle Firebase errors
+    console.error('Error changing password:', error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
-router.route("/account-deatils-update").patch(verifyToken, async (req, res) => {
+
+router.route("/account-details-update").patch(verifyToken, async (req, res) => {
   try {
     const { name, email } = req.body;
     const userType = req.user.type;
-    
-    // console.log(auth);
+    const userId = req.user.uid;
 
     if (!userType) {
       return res.status(401).json("User is not authenticated");
     }
 
+    // Update email in Firebase Auth and send verification email if needed
+    if (email) {
+      await admin.auth().updateUser(userId, { email: email });
+    }
+
+    let user;
     if (userType === "borrower") {
-      // Update email and send verification email
-      await admin.auth().updateUser(req.user.uid, {
-        email: email
-      });
-
-      const borrower = await Borrower.findOne({ uid: req.user.uid });
-      if (!borrower) {
-        return res.status(404).json('Borrower not found');
+      user = await Borrower.findOne({ uid: userId });
+      if (!user) {
+        return res.status(404).json("Borrower not found");
       }
-
-      // Update borrower's name if provided
-      if (name) {
-        borrower.fullname = name;
+    } else if (userType === "lender") {
+      user = await Lender.findOne({ uid: userId });
+      if (!user) {
+        return res.status(404).json("Lender not found");
       }
-      if (email) {
-        borrower.email = email;
-      }
-
-      await borrower.save();
-
-      // Fetch updated details and send response
-      const updateDetails = await Borrower.findById(borrower._id).select("-password -panCard -aadharCard -refreshToken");
-      if (!updateDetails) {
-        return res.status(500).json("Internal Server Error");
-      }
-
-      return res.status(200).json({
-        message: "Email and name updated successfully",
-        updateDetails: updateDetails
-      });
+    } else {
+      return res.status(400).json("Invalid userType");
     }
 
-    if (userType === "lender") {
-      // Update email and send verification email
-      await admin.auth().updateUser(userId, {
-        email: email
-      });
-      const lender = await Lender.findOne({ uid: req.user.uid });
-      if (!lender) {
-        return res.status(404).json('Lender not found');
-      }
-
-      // Update lender's name if provided
-      if (name) {
-        lender.fullname = name;
-      }
-      if (email) {
-        lender.email = email;
-      }
-
-      await lender.save();
-
-      // Fetch updated details and send response
-      const updateDetails = await Lender.findById(lender._id).select("-password -panCard -aadharCard -refreshToken");
-      if (!updateDetails) {
-        return res.status(500).json("Internal Server Error");
-      }
-
-      return res.status(200).json({
-        message: "Email and name updated successfully",
-        updateDetails: updateDetails
-      });
+    // Update user's name if provided
+    if (name) {
+      user.fullname = name;
+    }
+    if (email) {
+      user.email = email;
     }
 
-    // Handle unexpected userType
-    return res.status(400).json("Invalid userType");
+    await user.save();
+
+    // Fetch updated details and send response
+    const updateDetails = await user.constructor.findById(user._id).select("-password -panCard -aadharCard -refreshToken");
+    if (!updateDetails) {
+      return res.status(500).json("Internal Server Error");
+    }
+
+    return res.status(200).json({
+      message: "Email and name updated successfully",
+      updateDetails: updateDetails
+    });
 
   } catch (error) {
-    console.error(error);
+    console.error("Error updating account details:", error);
     return res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
-})
+});
+
 
 router.route('/current-user').get(verifyToken, async (req, res) => {
   const userId = req.user.uid;
@@ -421,8 +424,10 @@ router.route('/current-user').get(verifyToken, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    await userData.decryptFields();
-    console.log(userData)
+    if (typeof userData.decryptFields === 'function') {
+      await userData.decryptFields();
+    }
+
     res.status(200).json(userData);
   } catch (error) {
     console.error('Error fetching user data:', error);
@@ -430,28 +435,35 @@ router.route('/current-user').get(verifyToken, async (req, res) => {
   }
 });
 
+
 router.route('/delete-user/:id').delete(verifyToken, async (req, res) => {
   const userId = req.params.id;
   const userType = req.user.type;
 
   try {
     if (userType === "lender") {
-      await Lender.findOneAndDelete({uid:userId})
-      await admin.auth().deleteUser(userId)
-      res.status(200).json(`Successfully deleted Lender with UID: ${req.user.uid}`)
+      const lender = await Lender.findOneAndDelete({ uid: userId });
+      if (!lender) {
+        return res.status(404).json({ error: "Lender not found" });
+      }
+      await admin.auth().deleteUser(userId);
+      res.status(200).json({ message: `Successfully deleted Lender with UID: ${userId}` });
     } else if (userType === "borrower") {
-      await Borrower.findOneAndDelete({uid:userId})
-      await admin.auth().deleteUser(userId)
-      res.status(200).json(`Successfully deleted Borrower with UID: ${req.user.uid}`)
+      const borrower = await Borrower.findOneAndDelete({ uid: userId });
+      if (!borrower) {
+        return res.status(404).json({ error: "Borrower not found" });
+      }
+      await admin.auth().deleteUser(userId);
+      res.status(200).json({ message: `Successfully deleted Borrower with UID: ${userId}` });
     } else {
-      res.status(200).json("You are not Lender or Borrower")
+      res.status(403).json({ error: "Unauthorized user type" });
     }
-
   } catch (error) {
-    console.log(error)
-    res.status(500).json("Internal Server Error")
+    console.error("Error deleting user:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
-})
+});
+
 
 // Logout Route
 
@@ -459,36 +471,124 @@ router.route("/logout").get(verifyToken, async (req, res) => {
   const uid = req.user.uid;
 
   try {
+    let user;
+
+    // Find and update user to unset refreshToken
     if (req.user.type === "lender") {
-      await Lender.findOneAndUpdate({ uid }, { $unset: { refreshToken: 1 } }, { new: true });
+      user = await Lender.findOneAndUpdate({ uid }, { $unset: { refreshToken: 1 } }, { new: true });
     } else if (req.user.type === "borrower") {
-      await Borrower.findOneAndUpdate({ uid }, { $unset: { refreshToken: 1 } }, { new: true });
+      user = await Borrower.findOneAndUpdate({ uid }, { $unset: { refreshToken: 1 } }, { new: true });
     } else {
       throw new Error('Invalid user type');
     }
 
+    // Clear refreshToken cookie
     const options = {
       httpOnly: true,
       secure: true,
+      sameSite: "strict",
     };
+    res.clearCookie("refreshToken", options);
 
-    res.clearCookie("refreshToken", options).json({ message: "User logged out successfully" });
+    // Respond with success message
+    res.status(200).json({ message: "User logged out successfully" });
   } catch (error) {
+    // Handle errors
     console.error('Logout error:', error);
     res.status(500).json({ message: "Failed to logout user", error: error.message });
   }
-})
+});
+
+
+// Get any User Details
+
+router.route("/details/:id").get(verifyToken, async (req, res) => {
+  const borrowerId = req.params.id;
+  const userType = req.user.type;
+
+  try {
+    if (userType !== 'lender') {
+      return res.status(403).json({ error: 'Unauthorized access. Only lenders can view borrower details.' });
+    }
+
+    const borrowerData = await Borrower.findOne({ uid: borrowerId }).select('-refreshToken -panCard -aadharCard');
+
+    if (!borrowerData) {
+      return res.status(404).json({ error: 'Borrower not found' });
+    }
+
+    res.status(200).json(borrowerData);
+  } catch (error) {
+    console.error('Error fetching borrower details:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 
 
 
 // Get ALL User 
 
-router.route("/getall-lender").get(verifyToken,async(req,res)=>{
-  const userType = req.user.type
-  let UserData 
+router.route("/getall-lender").get(verifyToken, async (req, res) => {
+  try {
+    const userType = req.user.type;
 
-  if(userType==="lender"){
-    userData = await Borrower.find()
+    if (userType !== "lender") {
+      return res.status(403).json({ error: "Unauthorized access" });
+    }
+
+    // Fetch all lenders excluding refreshToken
+    const lenders = await Lender.find().select("-refreshToken");
+
+    // Check if lenders array is empty
+    if (lenders.length === 0) {
+      return res.status(404).json({ error: "No lenders found" });
+    }
+
+    // Decrypt sensitive fields for each lender
+    for (let lender of lenders) {
+      if (typeof lender.decryptFields === 'function') {
+        await lender.decryptFields();
+      }
+    }
+
+    // Respond with decrypted lenders data
+    res.status(200).json(lenders);
+  } catch (error) {
+    console.error("Error fetching lenders:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
-})
+});
+
+router.route("/getall-borrower").get(verifyToken, async (req, res) => {
+  try {
+    const userType = req.user.type;
+
+    if (userType !== "borrower") {
+      return res.status(403).json({ error: "Unauthorized access" });
+    }
+
+    // Fetch all borrowers excluding refreshToken
+    const borrowers = await Borrower.find().select("-refreshToken");
+
+    // Check if borrowers array is empty
+    if (borrowers.length === 0) {
+      return res.status(404).json({ error: "No borrowers found" });
+    }
+
+    // Decrypt sensitive fields for each borrower
+    for (let borrower of borrowers) {
+      if (typeof borrower.decryptFields === 'function') {
+        await borrower.decryptFields();
+      }
+    }
+
+    // Respond with decrypted borrowers data
+    res.status(200).json(borrowers);
+  } catch (error) {
+    console.error("Error fetching borrowers:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 export default router;
