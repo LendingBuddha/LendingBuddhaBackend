@@ -1,4 +1,5 @@
 import mongoose, { Schema } from "mongoose";
+import { decrypt, encrypt } from "../utils/encryption.js";
 
 const BorrowerSchema = new Schema(
   {
@@ -42,5 +43,17 @@ const BorrowerSchema = new Schema(
     timestamps: true,
   }
 );
+
+BorrowerSchema.pre('save', function (next) {
+  this.aadharCard = encrypt(this.aadharCard);
+  this.panCard = encrypt(this.panCard);
+  next();
+});
+
+BorrowerSchema.methods.decryptFields = function () {
+  this.aadharCard = decrypt(this.aadharCard);
+  this.panCard = decrypt(this.panCard);
+  return this;
+};
 
 export const Borrower = mongoose.model("Borrower", BorrowerSchema);
