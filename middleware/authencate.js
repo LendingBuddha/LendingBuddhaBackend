@@ -26,7 +26,7 @@ import { Borrower } from "../models/Borrower.js";
 // Middleware to verify JWT token
 const verifyToken = async (req, res, next) => {
     // Get token from cookies or Authorization header
-    let idToken = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "");
+    const idToken = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "");
   
     // Check if token is undefined or empty
     if (!idToken) {
@@ -35,8 +35,19 @@ const verifyToken = async (req, res, next) => {
   
     try {
       // Verify token
-      const decoded = await jwt.verify(idToken, JWT_SECRET_KEY);
-      req.user = decoded;
+      let user;
+      const decoded = jwt.verify(idToken, process.env.JWT_SECRET_KEY);
+      //verify  roles
+      if(decoded.type === 'lender'){
+          user=await Lender.findById(decoded.uid);
+      }else if(decoded.type === 'borrower'){
+          user=await Borrower.findById(decoded.uid);
+      }
+      if(!user) return res.status(401).json({error : "Access denied . Invalid Tokens"})
+      
+      req.user = user;
+      req.type=decoded.type;
+
       next(); 
     } catch (err) {
       // Handle verification errors
@@ -45,44 +56,25 @@ const verifyToken = async (req, res, next) => {
     }
   };
    
-  //verify isLender 
 
-  const isLender=async (req,res,next)=>{
-    try {
-       const lender=await Lender.findById(req.user.uid)
-       if(!lender){
-          return res.status(404).json({error : "Lender Not Found"})
-       }
-
-       if(lender.role != 'lender'){
-        return res.status(403).json({error : "Forbiden Lender Not Found"})
-       }
-       req.lender=lender;
-       next();
-    } catch (error) {
-      return res.status(500).json({ error: 'Server Error' });
-    }
-}
-
-// verify is borrower
-
-const isBorrower=async (req,res,next)=>{
-  try {
-     const borrower=await Borrower.findById(req.user.uid)
-     if(!borrower){
-        return res.status(404).json({error : "Borrower Not Found"})
+  const authorizeRoles= (allowedTypes)=>{
+     
+     return (req,res,next)=>{
+       
+      if(!allowedTypes.includes(req.type)){
+            
+           return res.status(403).json ({error : 'Access denied . You do not have required permissions'})
+      }
+      next();
      }
-
-     if(borrower.role != 'borrower'){
-      return res.status(403).json({error : "Forbiden Borrower Not Found"})
-     }
-     req.borrower=borrower;
-     next();
-  } catch (error) {
-    return res.status(500).json({ error: 'Server Error' });
+    
+      
   }
-}
 
 
 
-  module.exports={ verifyToken , isLender,isBorrower}
+
+
+
+
+  module.exports={ verifyToken ,authorizeRoles}
