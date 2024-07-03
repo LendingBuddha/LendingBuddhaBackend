@@ -43,7 +43,7 @@ const generateJWT = (uid, type, time) => {
   return jwt.sign({ uid: uid, type: type }, process.env.JWT_SECRET_KEY, { expiresIn: `${time}` });
 };
 
-//POST - Register new user
+//POST - Register new Lender
 router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
   const { fullname, email, password, dob, pancard, aadharcard, phonenumber } = req.body;
   const profilePic = req.file.path; // Get the file path from multer
@@ -89,27 +89,39 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
   }
 });
 
-
+// post route Borrower
 router.post("/signup/borrower", upload.single("profilePic"), async (req, res) => {
-  const { fullname, email, password, dob, pancard, aadharcard, phonenumber, profilePic } =
-    req.body;
+  const {
+    fullname,
+    email,
+    password,
+    dob,
+    pancard,
+    aadharcard,
+    phonenumber,
+    cibilscore, 
+  } = req.body;
+  const profilePic = req.file; 
+
   try {
-
+    
     const BorrowerUser = await Borrower.findOne({ email });
-    if (BorrowerUser) return res.send("User Exists");
+    if (BorrowerUser) return res.status(400).send("User Exists");
 
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
+    
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
+
+
     const result = await uploadImage(profilePic);
+    if (!result || !result.url) {
+      throw new Error("Image upload failed");
+    }
 
+    const hashPan = await bcrypt.hash(pancard, 10);
+    const hashAadhar = await bcrypt.hash(aadharcard, 10);
 
-    // console.log("PanCard \t ", hashPan);
-    // console.log("Aadhar \t ", hashAadhar);
-
+    
     const borrowerUser = await Borrower.create({
       email,
       fullname,
@@ -117,13 +129,13 @@ router.post("/signup/borrower", upload.single("profilePic"), async (req, res) =>
       dateOfBirth: dob,
       panCard: pancard,
       aadharCard: aadharcard,
+      cibilScore: cibilscore, 
       uid: user.uid,
-      profilePic: result.url
+      profilePic: result.url,
     });
 
-    const createdUser = await Borrower.findById(borrowerUser._id).select(
-      "-panCard -aadharCard "
-    );
+   
+    const createdUser = await Borrower.findById(borrowerUser._id).select("-panCard -aadharCard");
     if (!createdUser) {
       return res.status(500).send("Internal Error!!!");
     }
@@ -133,7 +145,6 @@ router.post("/signup/borrower", upload.single("profilePic"), async (req, res) =>
       data: createdUser,
     });
   } catch (error) {
-    const errorCode = error.code;
     const errorMessage = error.message;
     res.status(500).send({ error: errorMessage });
   }
