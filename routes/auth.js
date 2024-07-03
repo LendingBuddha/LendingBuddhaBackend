@@ -142,32 +142,28 @@ router.post("/signup/borrower", upload.single("profilePic"), async (req, res) =>
 // POST- Login user
 router.post("/login/lender", async (req, res) => {
   const { email, password } = req.body;
+  console.log('Login request received:', req.body);
 
-  signInWithEmailAndPassword(auth, email, password)
-    .then((userCredential) => {
-      // Signed in
-      const user = userCredential.user;
-      // ...
-      const accessToken = generateJWT(user.uid, "lender", "30m")
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    console.log('User signed in:', user);
 
-      const refreshToken = generateJWT(user.uid, "lender", "30d")
+    const accessToken = generateJWT(user.uid, "lender", "30m");
+    const refreshToken = generateJWT(user.uid, "lender", "30d");
 
-      // Set refresh token in an HTTP-only and secure cookie
-      res.cookie("refreshToken", refreshToken, {
-        httpOnly: true,
-        secure: true,
-        // sameSite: "strict",
-      });
-
-      res.setHeader("Authorization", `Bearer ${accessToken}`);
-
-      // Send response indicating successful login
-      res.status(200).json({ message: "User logged in successfully", user });
-    })
-    .catch((error) => {
-      const errorMessage = error.message;
-      res.status(500).send(errorMessage);
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: true,
+      // sameSite: "strict",
     });
+
+    res.setHeader("Authorization", `Bearer ${accessToken}`);
+    res.status(200).json({ message: "User logged in successfully", user });
+  } catch (error) {
+    console.error('Error during login:', error.message);
+    res.status(500).send(error.message);
+  }
 });
 
 router.post("/login/borrower", async (req, res) => {
