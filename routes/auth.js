@@ -123,12 +123,12 @@ router.post("/signup/borrower", upload.single("profilePic"), async (req, res) =>
     pancard,
     aadharcard,
     phonenumber,
-    cibilscore, 
+    cibilscore,
   } = req.body;
-  const profilePic = req.file; 
+  const profilePic = req.file;
 
   try {
-    
+
     const BorrowerUser = await Borrower.findOne({ email });
     if (BorrowerUser) {
       return res.status(400).json({ error: "User already exists" });
@@ -148,7 +148,7 @@ router.post("/signup/borrower", upload.single("profilePic"), async (req, res) =>
       dateOfBirth: dob,
       panCard: pancard,
       aadharCard: aadharcard,
-      cibilScore: cibilscore, 
+      cibilScore: cibilscore,
       uid: user.uid,
       profilePic: result.url,
     });
@@ -225,11 +225,13 @@ router.post("/login/borrower", async (req, res) => {
       res.setHeader("Authorization", `Bearer ${accessToken}`);
 
       // Send response indicating successful login
-      res.status(200).json({ message: "User logged in successfully", user: {
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-      }, });
+      res.status(200).json({
+        message: "User logged in successfully", user: {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+        },
+      });
     })
     .catch((error) => {
       const errorMessage = error.message;
@@ -593,5 +595,81 @@ router.route("/getall-borrower").get(verifyToken, async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
+
+
+// Search Route
+router.route("/lender/search").get(verifyToken, async (req, res) => {
+  try {
+    const { fullname, email, phoneNumber, uid, page = 1, limit = 10 } = req.query;
+    let query = {};
+    if (fullname) {
+        query.fullname = { $regex: new RegExp(fullname, 'i') }; 
+    if (email) {
+        query.email = { $regex: new RegExp(email, 'i') }; 
+    }
+    if (phoneNumber) {
+        query.phoneNumber = phoneNumber;
+    }
+    if (uid) {
+        query.uid = uid;
+    }
+
+    const skip = (page - 1) * limit;
+    const lenders = await Lender.find(query)
+                               .skip(skip)
+                               .limit(parseInt(limit, 10));
+
+    const totalCount = await Lender.countDocuments(query);
+    res.json({
+        total: totalCount,
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10),
+        totalPages: Math.ceil(totalCount / limit),
+        data: lenders
+    });
+}} catch (error) {
+    console.error('Error searching lenders:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+}
+}
+)
+
+router.route("/borrower/search").get(verifyToken, async (req, res) => {
+  try {
+    const { fullname, email, phoneNumber, uid, page = 1, limit = 10 } = req.query;
+    let query = {};
+    if (fullname) {
+        query.fullname = { $regex: new RegExp(fullname, 'i') }; 
+    if (email) {
+        query.email = { $regex: new RegExp(email, 'i') }; 
+    }
+    if (phoneNumber) {
+        query.phoneNumber = phoneNumber;
+    }
+    if (uid) {
+        query.uid = uid;
+    }
+
+    const skip = (page - 1) * limit;
+    const borrowers = await Borrower.find(query)
+                               .skip(skip)
+                               .limit(parseInt(limit, 10)).select("-panCard -aadharCard");
+
+    const totalCount = await Borrower.countDocuments(query);
+    res.json({
+        total: totalCount,
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10),
+        totalPages: Math.ceil(totalCount / limit),
+        data: borrowers
+    });
+}} catch (error) {
+    console.error('Error searching borrower:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+}
+}
+)
+
 
 export default router;
