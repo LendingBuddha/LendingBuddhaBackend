@@ -604,34 +604,35 @@ router.route("/lender/search").get(verifyToken, async (req, res) => {
     const { fullname, email, phoneNumber, uid, page = 1, limit = 10 } = req.query;
     let query = {};
     if (fullname) {
-        query.fullname = { $regex: new RegExp(fullname, 'i') }; 
-    if (email) {
-        query.email = { $regex: new RegExp(email, 'i') }; 
-    }
-    if (phoneNumber) {
+      query.fullname = { $regex: new RegExp(fullname, 'i') };
+      if (email) {
+        query.email = { $regex: new RegExp(email, 'i') };
+      }
+      if (phoneNumber) {
         query.phoneNumber = phoneNumber;
-    }
-    if (uid) {
+      }
+      if (uid) {
         query.uid = uid;
-    }
+      }
 
-    const skip = (page - 1) * limit;
-    const lenders = await Lender.find(query)
-                               .skip(skip)
-                               .limit(parseInt(limit, 10));
+      const skip = (page - 1) * limit;
+      const lenders = await Lender.find(query)
+        .skip(skip)
+        .limit(parseInt(limit, 10));
 
-    const totalCount = await Lender.countDocuments(query);
-    res.json({
+      const totalCount = await Lender.countDocuments(query);
+      res.json({
         total: totalCount,
         page: parseInt(page, 10),
         limit: parseInt(limit, 10),
         totalPages: Math.ceil(totalCount / limit),
         data: lenders
-    });
-}} catch (error) {
+      });
+    }
+  } catch (error) {
     console.error('Error searching lenders:', error);
     res.status(500).json({ error: 'Internal Server Error' });
-}
+  }
 }
 )
 
@@ -640,34 +641,36 @@ router.route("/borrower/search").get(verifyToken, async (req, res) => {
     const { fullname, email, phoneNumber, uid, page = 1, limit = 10 } = req.query;
     let query = {};
     if (fullname) {
-        query.fullname = { $regex: new RegExp(fullname, 'i') }; 
-    if (email) {
-        query.email = { $regex: new RegExp(email, 'i') }; 
-    }
-    if (phoneNumber) {
+      query.fullname = { $regex: new RegExp(fullname, 'i') };
+      if (email) {
+        query.email = { $regex: new RegExp(email, 'i') };
+      }
+      if (phoneNumber) {
         query.phoneNumber = phoneNumber;
-    }
-    if (uid) {
+      }
+      if (uid) {
         query.uid = uid;
-    }
+      }
 
-    const skip = (page - 1) * limit;
-    const borrowers = await Borrower.find(query)
-                               .skip(skip)
-                               .limit(parseInt(limit, 10)).select("-panCard -aadharCard");
+      const skip = (page - 1) * limit;
+      const borrowers = await Borrower.find(query)
+        .skip(skip)
+        .limit(parseInt(limit, 10))
+        .select("-panCard -aadharCard");
 
-    const totalCount = await Borrower.countDocuments(query);
-    res.json({
+      const totalCount = await Borrower.countDocuments(query);
+      res.json({
         total: totalCount,
         page: parseInt(page, 10),
         limit: parseInt(limit, 10),
         totalPages: Math.ceil(totalCount / limit),
         data: borrowers
-    });
-}} catch (error) {
+      });
+    }
+  } catch (error) {
     console.error('Error searching borrower:', error);
     res.status(500).json({ error: 'Internal Server Error' });
-}
+  }
 }
 )
 
