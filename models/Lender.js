@@ -37,25 +37,36 @@ const LenderSchema = new Schema(
     refreshToken: {
       type: String,
     },
-    profilePic:{
-      type:String
-    }
+    profilePic: {
+      type: String,
+    },
   },
   {
     timestamps: true,
   }
 );
 
-
 LenderSchema.pre('save', function (next) {
-  this.aadharCard = encrypt(this.aadharCard);
-  this.panCard = encrypt(this.panCard);
-  next();
+  try {
+    if (this.isModified('aadharCard')) {
+      this.aadharCard = encrypt(this.aadharCard);
+    }
+    if (this.isModified('panCard')) {
+      this.panCard = encrypt(this.panCard);
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
 LenderSchema.methods.decryptFields = function () {
-  this.aadharCard = decrypt(this.aadharCard);
-  this.panCard = decrypt(this.panCard);
+  try {
+    this.aadharCard = decrypt(this.aadharCard);
+    this.panCard = decrypt(this.panCard);
+  } catch (error) {
+    console.error('Error decrypting fields:', error);
+  }
   return this;
 };
 

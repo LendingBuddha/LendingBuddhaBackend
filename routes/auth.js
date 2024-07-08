@@ -6,14 +6,13 @@ import {
 import { auth } from "../config/firebase-config.js";
 import { Lender } from "../models/Lender.js";
 import { Borrower } from "../models/Borrower.js";
-import jwt from 'jsonwebtoken'
+import jwt from "jsonwebtoken";
 import ImageKit from "imagekit";
-import fs from 'fs';
+import * as fs from "node:fs/promises";
 import verifyToken from "../middleware/authencate.js";
 import { upload } from "../middleware/multer.js";
 import admin from "../config/firebase-admin.mjs";
-
-
+import path from "node:path";
 
 const imagekit = new ImageKit({
   publicKey: process.env.PUBLIC_KEY,
@@ -23,25 +22,37 @@ const imagekit = new ImageKit({
 
 async function uploadImage(filePath) {
   try {
-    if (!filePath) return "Could Not find the path ";
-    const data = await fs.promises.readFile(filePath);
-    let base64data = Buffer.from(data).toString("base64");
+    console.log(filePath);
+    if (!filePath) throw new Error("Could not find the path");
 
-    const result = await ImageKit.upload({
-      file: base64data,
+    // Read file data
+    const data = await fs.readFile(filePath);
+    const base64data = Buffer.from(data).toString("base64");
+
+    // Upload to ImageKit
+    const result = await imagekit.upload({
+      // file: filePath.path,
+      file:base64data,
       fileName: "Image",
     });
-    await fs.promises.unlink(filePath);
+    // console.log(result);
+    const fullPath = path.resolve(filePath);
+    // Delete local file after successful upload
+    await fs.unlink(fullPath);
+
     return result;
   } catch (error) {
-    console.log({ message: error.message });
+    console.log({ message: error.message }); // Log the error message
+    throw error; // Propagate the error for further handling
   }
 }
 
 const router = Router();
 
 const generateJWT = (uid, type, time) => {
-  return jwt.sign({ uid: uid, type: type }, process.env.JWT_SECRET_KEY, { expiresIn: `${time}` });
+  return jwt.sign({ uid: uid, type: type }, process.env.JWT_SECRET_KEY, {
+    expiresIn: `${time}`,
+  });
 };
 
 //POST - Register new Lender
@@ -54,7 +65,7 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
     pancard,
     aadharcard,
     phonenumber,
-    cibilscore
+    cibilscore,
   } = req.body;
 
   const profilePic = req.file ? req.file.path : null;
@@ -73,7 +84,9 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
     // Upload profile picture
     const result = await uploadImage(profilePic);
     if (!result || !result.url) {
-      return res.status(500).json({ error: "Failed to upload profile picture" });
+      return res
+        .status(500)
+        .json({ error: "Failed to upload profile picture" });
     }
 
     // Save user details in the database
@@ -89,7 +102,11 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
     });
 
     // If database entry is successful, create user in Firebase
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
     const user = userCredential.user;
 
     // Update the database entry with the Firebase user ID
@@ -125,12 +142,12 @@ router.post("/signup/borrower", upload.single("profilePic"), async (req, res) =>
     phonenumber,
     cibilscore,
   } = req.body;
-  const profilePic = req.file;
+  const profilePic = req.file?.path ;
 
   try {
-
-    const BorrowerUser = await Borrower.findOne({ email });
-    if (BorrowerUser) {
+    // Check if user already exists
+    const existingBorrower = await Borrower.findOne({ email });
+    if (existingBorrower) {
       return res.status(400).json({ error: "User already exists" });
     }
 
@@ -149,11 +166,10 @@ router.post("/signup/borrower", upload.single("profilePic"), async (req, res) =>
       panCard: pancard,
       aadharCard: aadharcard,
       cibilScore: cibilscore,
-      uid: user.uid,
       profilePic: result.url,
     });
 
-    // If database entry is successful, create user in Firebase
+    // Create user in Firebase Authentication
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
@@ -162,31 +178,36 @@ router.post("/signup/borrower", upload.single("profilePic"), async (req, res) =>
     await borrowerUser.save();
 
     // Retrieve the created user without sensitive information
-    const createdUser = await Borrower.findById(borrowerUser._id).select(
-      "-panCard -aadharCard"
-    );
+    const createdUser = await Borrower.findById(borrowerUser._id).select("-panCard -aadharCard");
     if (!createdUser) {
       return res.status(500).send("Internal Error");
     }
 
+    // Respond with success message and user data
     res.status(201).json({
       message: "Borrower User created",
       data: createdUser,
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    // Handle errors
+    console.error("Error in signup borrower route:", error);
+    res.status(500).json({ message: "Error in Signup Borrower Route", error: error.message });
   }
 });
 
 // POST- Login user
 router.post("/login/lender", async (req, res) => {
   const { email, password } = req.body;
-  console.log('Login request received:', req.body);
+  console.log("Login request received:", req.body);
 
   try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const userCredential = await signInWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
     const user = userCredential.user;
-    console.log('User signed in:', user);
+    console.log("User signed in:", user);
 
     const accessToken = generateJWT(user.uid, "lender", "30m");
     const refreshToken = generateJWT(user.uid, "lender", "30d");
@@ -200,7 +221,7 @@ router.post("/login/lender", async (req, res) => {
     res.setHeader("Authorization", `Bearer ${accessToken}`);
     res.status(200).json({ message: "User logged in successfully", user });
   } catch (error) {
-    console.error('Error during login:', error.message);
+    console.error("Error during login:", error.message);
     res.status(500).send(error.message);
   }
 });
@@ -212,8 +233,8 @@ router.post("/login/borrower", async (req, res) => {
     .then((userCredential) => {
       // Signed in
       const user = userCredential.user;
-      const accessToken = generateJWT(user.uid, "borrower", "30m")
-      const refreshToken = generateJWT(user.uid, "borrower", "30d")
+      const accessToken = generateJWT(user.uid, "borrower", "30m");
+      const refreshToken = generateJWT(user.uid, "borrower", "30d");
 
       // Set refresh token in an HTTP-only and secure cookie
       res.cookie("refreshToken", refreshToken, {
@@ -226,7 +247,8 @@ router.post("/login/borrower", async (req, res) => {
 
       // Send response indicating successful login
       res.status(200).json({
-        message: "User logged in successfully", user: {
+        message: "User logged in successfully",
+        user: {
           uid: user.uid,
           email: user.email,
           displayName: user.displayName,
@@ -239,7 +261,6 @@ router.post("/login/borrower", async (req, res) => {
     });
 });
 
-
 // GET - HOME_ROUTE
 router.route("/lenderhome").get(verifyToken, async (req, res) => {
   try {
@@ -249,7 +270,7 @@ router.route("/lenderhome").get(verifyToken, async (req, res) => {
         data: req.user.uid,
       });
     } else {
-      return res.status(401).send("Your are not Lender ")
+      return res.status(401).send("Your are not Lender ");
     }
   } catch (e) {
     console.log(e);
@@ -264,9 +285,9 @@ router.route("/borrowerhome").get(verifyToken, async (req, res) => {
       return res.status(200).json({
         message: "Welcome to Protected Route of Borrower Home",
         data: req.user.uid,
-      })
+      });
     } else {
-      return res.status(401).send("Your are not Borrower ")
+      return res.status(401).send("Your are not Borrower ");
     }
   } catch (e) {
     console.log(e);
@@ -310,14 +331,14 @@ router.route("/refreshtoken").get(verifyToken, async (req, res) => {
     // Send the new access token in the response
     res.status(200).json({ accessToken });
   } catch (error) {
-    if (error.name === 'TokenExpiredError') {
+    if (error.name === "TokenExpiredError") {
       res.clearCookie("refreshToken", {
         httpOnly: true,
         secure: true,
         sameSite: "strict",
       });
       return res.status(403).json({ error: "Refresh token expired" });
-    } else if (error.name === 'JsonWebTokenError') {
+    } else if (error.name === "JsonWebTokenError") {
       return res.status(403).json({ error: "Invalid refresh token" });
     }
 
@@ -346,11 +367,10 @@ router.route("/passwordchange").post(verifyToken, async (req, res) => {
     res.status(200).json({ message: "Password changed successfully" });
   } catch (error) {
     // Handle Firebase errors
-    console.error('Error changing password:', error);
+    console.error("Error changing password:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
-
 
 router.route("/account-details-update").patch(verifyToken, async (req, res) => {
   try {
@@ -393,55 +413,57 @@ router.route("/account-details-update").patch(verifyToken, async (req, res) => {
     await user.save();
 
     // Fetch updated details and send response
-    const updateDetails = await user.constructor.findById(user._id).select("-password -panCard -aadharCard -refreshToken");
+    const updateDetails = await user.constructor
+      .findById(user._id)
+      .select("-password -panCard -aadharCard -refreshToken");
     if (!updateDetails) {
       return res.status(500).json("Internal Server Error");
     }
 
     return res.status(200).json({
       message: "Email and name updated successfully",
-      updateDetails: updateDetails
+      updateDetails: updateDetails,
     });
-
   } catch (error) {
     console.error("Error updating account details:", error);
-    return res.status(500).json({ message: "Internal Server Error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   }
 });
 
-
-router.route('/current-user').get(verifyToken, async (req, res) => {
-  const userId = req.user.uid;
-  const userType = req.user.type;
+router.route("/current-user").get(verifyToken, async (req, res) => {
+  const { uid: userId, type: userType } = req.user;
 
   try {
     let userData;
 
-    if (userType === 'lender') {
-      userData = await Lender.findOne({ uid: userId }).select('-refreshToken');
-    } else if (userType === 'borrower') {
-      userData = await Borrower.findOne({ uid: userId }).select('-refreshToken');
+    if (userType === "lender") {
+      userData = await Lender.findOne({ uid: userId }).select("-refreshToken");
+    } else if (userType === "borrower") {
+      userData = await Borrower.findOne({ uid: userId }).select(
+        "-refreshToken"
+      );
     } else {
-      return res.status(400).json({ error: 'Invalid user type' });
+      return res.status(400).json({ error: "Invalid user type" });
     }
 
     if (!userData) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ error: "User not found" });
     }
 
-    if (typeof userData.decryptFields === 'function') {
-      await userData.decryptFields();
+    if (typeof userData.decryptFields === "function") {
+      userData = userData.decryptFields();
     }
 
     res.status(200).json(userData);
   } catch (error) {
-    console.error('Error fetching user data:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error("Error fetching user data:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-
-router.route('/delete-user/:id').delete(verifyToken, async (req, res) => {
+router.route("/delete-user/:id").delete(verifyToken, async (req, res) => {
   const userId = req.params.id;
   const userType = req.user.type;
 
@@ -452,14 +474,18 @@ router.route('/delete-user/:id').delete(verifyToken, async (req, res) => {
         return res.status(404).json({ error: "Lender not found" });
       }
       await admin.auth().deleteUser(userId);
-      res.status(200).json({ message: `Successfully deleted Lender with UID: ${userId}` });
+      res
+        .status(200)
+        .json({ message: `Successfully deleted Lender with UID: ${userId}` });
     } else if (userType === "borrower") {
       const borrower = await Borrower.findOneAndDelete({ uid: userId });
       if (!borrower) {
         return res.status(404).json({ error: "Borrower not found" });
       }
       await admin.auth().deleteUser(userId);
-      res.status(200).json({ message: `Successfully deleted Borrower with UID: ${userId}` });
+      res
+        .status(200)
+        .json({ message: `Successfully deleted Borrower with UID: ${userId}` });
     } else {
       res.status(403).json({ error: "Unauthorized user type" });
     }
@@ -468,7 +494,6 @@ router.route('/delete-user/:id').delete(verifyToken, async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
-
 
 // Logout Route
 
@@ -480,11 +505,19 @@ router.route("/logout").get(verifyToken, async (req, res) => {
 
     // Find and update user to unset refreshToken
     if (req.user.type === "lender") {
-      user = await Lender.findOneAndUpdate({ uid }, { $unset: { refreshToken: 1 } }, { new: true });
+      user = await Lender.findOneAndUpdate(
+        { uid },
+        { $unset: { refreshToken: 1 } },
+        { new: true }
+      );
     } else if (req.user.type === "borrower") {
-      user = await Borrower.findOneAndUpdate({ uid }, { $unset: { refreshToken: 1 } }, { new: true });
+      user = await Borrower.findOneAndUpdate(
+        { uid },
+        { $unset: { refreshToken: 1 } },
+        { new: true }
+      );
     } else {
-      throw new Error('Invalid user type');
+      throw new Error("Invalid user type");
     }
 
     // Clear refreshToken cookie
@@ -499,11 +532,12 @@ router.route("/logout").get(verifyToken, async (req, res) => {
     res.status(200).json({ message: "User logged out successfully" });
   } catch (error) {
     // Handle errors
-    console.error('Logout error:', error);
-    res.status(500).json({ message: "Failed to logout user", error: error.message });
+    console.error("Logout error:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to logout user", error: error.message });
   }
 });
-
 
 // Get any User Details
 
@@ -512,38 +546,41 @@ router.route("/details/:id").get(verifyToken, async (req, res) => {
   const userType = req.user.type;
 
   try {
-    if (userType !== 'lender') {
-      return res.status(403).json({ error: 'Unauthorized access. Only lenders can view borrower details.' });
+    if (userType !== "lender") {
+      return res.status(403).json({
+        error: "Unauthorized access. Only lenders can view borrower details.",
+      });
     }
 
-    const borrowerData = await Borrower.findOne({ uid: borrowerId }).select('-refreshToken -panCard -aadharCard');
+    const borrowerData = await Borrower.findOne({ uid: borrowerId }).select(
+      "-refreshToken -panCard -aadharCard"
+    );
 
     if (!borrowerData) {
-      return res.status(404).json({ error: 'Borrower not found' });
+      return res.status(404).json({ error: "Borrower not found" });
     }
 
     res.status(200).json(borrowerData);
   } catch (error) {
-    console.error('Error fetching borrower details:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error("Error fetching borrower details:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
+// Get ALL User
 
-
-
-// Get ALL User 
-
-router.route("/getall-lender").get(verifyToken, async (req, res) => {
+router.route("/lender/users").get(verifyToken, async (req, res) => {
   try {
     const userType = req.user.type;
 
-    if (userType !== "lender") {
-      return res.status(403).json({ error: "Unauthorized access" });
-    }
+    // if (userType !== "lender") {
+    //   return res.status(403).json({ error: "Unauthorized access" });
+    // }
 
     // Fetch all lenders excluding refreshToken
-    const lenders = await Lender.find().select("-refreshToken");
+    const lenders = await Lender.find().select(
+      "-refreshToken -panCard -aadharCard"
+    );
 
     // Check if lenders array is empty
     if (lenders.length === 0) {
@@ -552,7 +589,7 @@ router.route("/getall-lender").get(verifyToken, async (req, res) => {
 
     // Decrypt sensitive fields for each lender
     for (let lender of lenders) {
-      if (typeof lender.decryptFields === 'function') {
+      if (typeof lender.decryptFields === "function") {
         await lender.decryptFields();
       }
     }
@@ -565,16 +602,18 @@ router.route("/getall-lender").get(verifyToken, async (req, res) => {
   }
 });
 
-router.route("/getall-borrower").get(verifyToken, async (req, res) => {
+router.route("/borrower/users").get(verifyToken, async (req, res) => {
   try {
     const userType = req.user.type;
 
-    if (userType !== "borrower") {
-      return res.status(403).json({ error: "Unauthorized access" });
-    }
+    // if (userType !== "borrower") {
+    //   return res.status(403).json({ error: "Unauthorized access" });
+    // }
 
     // Fetch all borrowers excluding refreshToken
-    const borrowers = await Borrower.find().select("-refreshToken");
+    const borrowers = await Borrower.find().select(
+      "-refreshToken "
+    );
 
     // Check if borrowers array is empty
     if (borrowers.length === 0) {
@@ -583,7 +622,7 @@ router.route("/getall-borrower").get(verifyToken, async (req, res) => {
 
     // Decrypt sensitive fields for each borrower
     for (let borrower of borrowers) {
-      if (typeof borrower.decryptFields === 'function') {
+      if (typeof borrower.decryptFields === "function") {
         await borrower.decryptFields();
       }
     }
@@ -596,17 +635,22 @@ router.route("/getall-borrower").get(verifyToken, async (req, res) => {
   }
 });
 
-
-
 // Search Route
 router.route("/lender/search").get(verifyToken, async (req, res) => {
   try {
-    const { fullname, email, phoneNumber, uid, page = 1, limit = 10 } = req.query;
+    const {
+      fullname,
+      email,
+      phoneNumber,
+      uid,
+      page = 1,
+      limit = 10,
+    } = req.query;
     let query = {};
     if (fullname) {
-      query.fullname = { $regex: new RegExp(fullname, 'i') };
+      query.fullname = { $regex: new RegExp(fullname, "i") };
       if (email) {
-        query.email = { $regex: new RegExp(email, 'i') };
+        query.email = { $regex: new RegExp(email, "i") };
       }
       if (phoneNumber) {
         query.phoneNumber = phoneNumber;
@@ -626,24 +670,30 @@ router.route("/lender/search").get(verifyToken, async (req, res) => {
         page: parseInt(page, 10),
         limit: parseInt(limit, 10),
         totalPages: Math.ceil(totalCount / limit),
-        data: lenders
+        data: lenders,
       });
     }
   } catch (error) {
-    console.error('Error searching lenders:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error("Error searching lenders:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
-}
-)
+});
 
 router.route("/borrower/search").get(verifyToken, async (req, res) => {
   try {
-    const { fullname, email, phoneNumber, uid, page = 1, limit = 10 } = req.query;
+    const {
+      fullname,
+      email,
+      phoneNumber,
+      uid,
+      page = 1,
+      limit = 10,
+    } = req.query;
     let query = {};
     if (fullname) {
-      query.fullname = { $regex: new RegExp(fullname, 'i') };
+      query.fullname = { $regex: new RegExp(fullname, "i") };
       if (email) {
-        query.email = { $regex: new RegExp(email, 'i') };
+        query.email = { $regex: new RegExp(email, "i") };
       }
       if (phoneNumber) {
         query.phoneNumber = phoneNumber;
@@ -664,15 +714,13 @@ router.route("/borrower/search").get(verifyToken, async (req, res) => {
         page: parseInt(page, 10),
         limit: parseInt(limit, 10),
         totalPages: Math.ceil(totalCount / limit),
-        data: borrowers
+        data: borrowers,
       });
     }
   } catch (error) {
-    console.error('Error searching borrower:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error("Error searching borrower:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
-}
-)
-
+});
 
 export default router;
