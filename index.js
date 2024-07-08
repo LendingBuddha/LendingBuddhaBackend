@@ -5,7 +5,6 @@ import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import cors from "cors";
 import dotenv from 'dotenv';
 
 dotenv.config();
