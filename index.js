@@ -1,5 +1,6 @@
 import express from "express";
 import AuthRoute from "./routes/auth.js";
+import ChatSession from "./routes/message.js";
 import connectDb from "./config/db.js";
 import http from "http";
 import { Server } from "socket.io";
@@ -39,6 +40,7 @@ await connectDb()
     });
 
     app.use("/api/auth", AuthRoute);
+    app.use("/chatroom",ChatSession)
 
     // send hello world
     app.get("/", (req, res) => {

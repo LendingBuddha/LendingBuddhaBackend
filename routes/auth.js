@@ -209,8 +209,8 @@ router.post("/login/lender", async (req, res) => {
     const user = userCredential.user;
     console.log("User signed in:", user);
 
-    const accessToken = generateJWT(user.uid, "lender", "30m");
-    const refreshToken = generateJWT(user.uid, "lender", "30d");
+    const accessToken = generateJWT(user.uid, "Lender", "30m");
+    const refreshToken = generateJWT(user.uid, "Lender", "30d");
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
@@ -233,8 +233,8 @@ router.post("/login/borrower", async (req, res) => {
     .then((userCredential) => {
       // Signed in
       const user = userCredential.user;
-      const accessToken = generateJWT(user.uid, "borrower", "30m");
-      const refreshToken = generateJWT(user.uid, "borrower", "30d");
+      const accessToken = generateJWT(user.uid, "Borrower", "30m");
+      const refreshToken = generateJWT(user.uid, "Borrower", "30d");
 
       // Set refresh token in an HTTP-only and secure cookie
       res.cookie("refreshToken", refreshToken, {
