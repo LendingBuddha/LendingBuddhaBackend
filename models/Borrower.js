@@ -10,7 +10,8 @@ const BorrowerSchema = new Schema({
     aadharCard: { type: String, required: true, unique: true },
     dateOfBirth: { type: Date, required: true },
     profilePic: { type: String, default: "" },
-   
+    chatRooms: [{ type: Schema.Types.ObjectId,  ref: 'ChatRoom' }],
+  
 
 }, { timestamps: true });
 
