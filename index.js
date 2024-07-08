@@ -5,8 +5,19 @@ import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import cors from "cors";
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const app = express();
+app.use(
+  cors({
+    origin: 'http://localhost:5173',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true,
+  })
+);
 
 const server = http.createServer(app);
 const io = new Server(server, {
