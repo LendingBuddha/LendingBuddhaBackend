@@ -262,7 +262,7 @@ router.post("/login/borrower", async (req, res) => {
 });
 
 // GET - HOME_ROUTE
-router.route("/lenderhome").get(verifyToken, async (req, res) => {
+router.route("/lenderhome").get(verifyToken,authorizeRoles(['lender']), async (req, res) => {
   try {
     if (req.user.type === "lender") {
       return res.status(200).json({
@@ -279,7 +279,7 @@ router.route("/lenderhome").get(verifyToken, async (req, res) => {
       .json({ message: "Internal Server Error", error: e.message });
   }
 });
-router.route("/borrowerhome").get(verifyToken, async (req, res) => {
+router.route("/borrowerhome").get(verifyToken,authorizeRoles(['borrower']), async (req, res) => {
   try {
     if (req.user.type === "borrower") {
       return res.status(200).json({
