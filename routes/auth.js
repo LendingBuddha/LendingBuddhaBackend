@@ -22,7 +22,7 @@ const imagekit = new ImageKit({
 
 async function uploadImage(filePath) {
   try {
-    console.log(filePath);
+    // console.log(filePath);
     if (!filePath) throw new Error("Could not find the path");
 
     // Read file data
@@ -32,7 +32,7 @@ async function uploadImage(filePath) {
     // Upload to ImageKit
     const result = await imagekit.upload({
       // file: filePath.path,
-      file:base64data,
+      file: base64data,
       fileName: "Image",
     });
     // console.log(result);
@@ -131,74 +131,88 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
 });
 
 // post route Borrower
-router.post("/signup/borrower", upload.single("profilePic"), async (req, res) => {
-  const {
-    fullname,
-    email,
-    password,
-    dob,
-    pancard,
-    aadharcard,
-    phonenumber,
-    cibilscore,
-  } = req.body;
-  const profilePic = req.file?.path ;
-
-  try {
-    // Check if user already exists
-    const existingBorrower = await Borrower.findOne({ email });
-    if (existingBorrower) {
-      return res.status(400).json({ error: "User already exists" });
-    }
-
-    // Upload profile picture
-    const result = await uploadImage(profilePic);
-    if (!result || !result.url) {
-      return res.status(500).json({ error: "Failed to upload profile picture" });
-    }
-
-    // Save user details in the database
-    const borrowerUser = await Borrower.create({
-      email,
+router.post("/signup/borrower",upload.single("profilePic"),async (req, res) => {
+    const {
       fullname,
-      phoneNumber: phonenumber,
-      dateOfBirth: dob,
-      panCard: pancard,
-      aadharCard: aadharcard,
-      cibilScore: cibilscore,
-      profilePic: result.url,
-    });
+      email,
+      password,
+      dob,
+      pancard,
+      aadharcard,
+      phonenumber,
+      cibilscore,
+    } = req.body;
+    const profilePic = req.file?.path;
 
-    // Create user in Firebase Authentication
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
+    try {
+      // Check if user already exists
+      const existingBorrower = await Borrower.findOne({ email });
+      if (existingBorrower) {
+        return res.status(400).json({ error: "User already exists" });
+      }
 
-    // Update the database entry with the Firebase user ID
-    borrowerUser.uid = user.uid;
-    await borrowerUser.save();
+      // Upload profile picture
+      const result = await uploadImage(profilePic);
+      if (!result || !result.url) {
+        return res
+          .status(500)
+          .json({ error: "Failed to upload profile picture" });
+      }
 
-    // Retrieve the created user without sensitive information
-    const createdUser = await Borrower.findById(borrowerUser._id).select("-panCard -aadharCard");
-    if (!createdUser) {
-      return res.status(500).send("Internal Error");
+      // Save user details in the database
+      const borrowerUser = await Borrower.create({
+        email,
+        fullname,
+        phoneNumber: phonenumber,
+        dateOfBirth: dob,
+        panCard: pancard,
+        aadharCard: aadharcard,
+        cibilScore: cibilscore,
+        profilePic: result.url,
+      });
+
+      // Create user in Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const user = userCredential.user;
+
+      // Update the database entry with the Firebase user ID
+      borrowerUser.uid = user.uid;
+      await borrowerUser.save();
+
+      // Retrieve the created user without sensitive information
+      const createdUser = await Borrower.findById(borrowerUser._id).select(
+        "-panCard -aadharCard"
+      );
+      if (!createdUser) {
+        return res.status(500).send("Internal Error");
+      }
+
+      // Respond with success message and user data
+      res.status(201).json({
+        message: "Borrower User created",
+        data: createdUser,
+      });
+    } catch (error) {
+      // Handle errors
+      console.error("Error in signup borrower route:", error);
+      res
+        .status(500)
+        .json({
+          message: "Error in Signup Borrower Route",
+          error: error.message,
+        });
     }
-
-    // Respond with success message and user data
-    res.status(201).json({
-      message: "Borrower User created",
-      data: createdUser,
-    });
-  } catch (error) {
-    // Handle errors
-    console.error("Error in signup borrower route:", error);
-    res.status(500).json({ message: "Error in Signup Borrower Route", error: error.message });
   }
-});
+);
 
 // POST- Login user
 router.post("/login/lender", async (req, res) => {
   const { email, password } = req.body;
-  console.log("Login request received:", req.body);
+  // console.log("Login request received:", req.body);
 
   try {
     const userCredential = await signInWithEmailAndPassword(
@@ -207,7 +221,7 @@ router.post("/login/lender", async (req, res) => {
       password
     );
     const user = userCredential.user;
-    console.log("User signed in:", user);
+    // console.log("User signed in:", user);
 
     const accessToken = generateJWT(user.uid, "Lender", "30m");
     const refreshToken = generateJWT(user.uid, "Lender", "30d");
@@ -219,7 +233,15 @@ router.post("/login/lender", async (req, res) => {
     });
 
     res.setHeader("Authorization", `Bearer ${accessToken}`);
-    res.status(200).json({ message: "User logged in successfully", user });
+    res.status(200).json({
+      message: "Lender logged in successfully",
+      data: {
+        email: user.email,
+        uid: user.uid,
+        displayName: user.displayName,
+      },
+      refreshToken: refreshToken,
+    });
   } catch (error) {
     console.error("Error during login:", error.message);
     res.status(500).send(error.message);
@@ -247,12 +269,13 @@ router.post("/login/borrower", async (req, res) => {
 
       // Send response indicating successful login
       res.status(200).json({
-        message: "User logged in successfully",
-        user: {
-          uid: user.uid,
+        message: "Borrower logged in successfully",
+        data: {
           email: user.email,
-          displayName: user.displayName,
+          uid: user.uid,
+          name: user.displayName,
         },
+        refreshToken: refreshToken,
       });
     })
     .catch((error) => {
@@ -611,9 +634,7 @@ router.route("/borrower/users").get(verifyToken, async (req, res) => {
     // }
 
     // Fetch all borrowers excluding refreshToken
-    const borrowers = await Borrower.find().select(
-      "-refreshToken "
-    );
+    const borrowers = await Borrower.find().select("-refreshToken ");
 
     // Check if borrowers array is empty
     if (borrowers.length === 0) {
@@ -722,7 +743,5 @@ router.route("/borrower/search").get(verifyToken, async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
-
-
 
 export default router;
