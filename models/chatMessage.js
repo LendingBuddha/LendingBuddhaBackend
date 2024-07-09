@@ -9,7 +9,7 @@ const chatMessageSchema = new Schema(
       required: true,
     },
     senderId: {
-      type: Schema.Types.ObjectId,
+      type: String,
       refPath: "senderType",
       required: true,
     },
@@ -19,7 +19,7 @@ const chatMessageSchema = new Schema(
       required: true,
     },
     receiverId: {
-      type: Schema.Types.ObjectId,
+      type: String,
       refPath: "recevierType",
       required: true,
     },

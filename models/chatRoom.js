@@ -6,7 +6,7 @@ const chatRoomSchema = new Schema(
     participants: [
       {
         userId: {
-          type: Schema.Types.ObjectId,
+          type: String,
           required: true,
           ref: "participants.userType",
         },
@@ -29,4 +29,4 @@ const chatRoomSchema = new Schema(
 );
 
 const ChatRoom = mongoose.model("ChatRoom", chatRoomSchema);
-module.exports = ChatRoom;
+export default ChatRoom
