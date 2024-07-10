@@ -7,13 +7,15 @@ import { Server } from "socket.io";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
+import { lenderData } from "./data/lender.js";
 
 dotenv.config();
-
+// for development purpose only
+const allowedOrigins=["http://localhost:5173","http://localhost:5174"];
 const app = express();
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin:allowedOrigins ,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     credentials: true,
   })
@@ -22,11 +24,17 @@ app.use(
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
   },
 });
-app.use(cors());
+app.use(
+  cors({
+    origin: ["*", "http://localhost:5173"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    credentials: true,
+  })
+);
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 app.use(express.static("public"));
@@ -40,7 +48,16 @@ await connectDb()
     });
 
     app.use("/api/auth", AuthRoute);
-    app.use("/chatroom",ChatSession)
+    app.use("/chatroom", ChatSession);
+
+    app.get("/api/lender/data", async (req, res) => {
+      try {
+        const data = lenderData;
+        res.status(200).json(data);
+      } catch (error) {
+        res.status(500).json({ message: error.message });
+      }
+    });
 
     // send hello world
     app.get("/", (req, res) => {
@@ -48,8 +65,12 @@ await connectDb()
     });
     io.on("connection", (socket) => {
       console.log("New client connected!");
+      socket.on("join-room", (roomId) => socket.join(roomId));
       socket.on("sendMessage", (message) => {
-        io.emit("receiveMessage", message);
+        io.to(message.members[0])
+          .to(message.members[1])
+          .emit("receiveMessage", message);
+          console.log(message.members)
       });
       socket.on("disconnect", () => {
         console.log("Client Disconnected!");
