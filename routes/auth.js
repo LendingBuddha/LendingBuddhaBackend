@@ -228,7 +228,7 @@ router.post("/login/lender", async (req, res) => {
 
 router.post("/login/borrower", async (req, res) => {
   const { email, password } = req.body;
-
+ 
   signInWithEmailAndPassword(auth, email, password)
     .then((userCredential) => {
       // Signed in
@@ -252,6 +252,7 @@ router.post("/login/borrower", async (req, res) => {
           uid: user.uid,
           email: user.email,
           displayName: user.displayName,
+          
         },
       });
     })
@@ -496,7 +497,6 @@ router.route("/delete-user/:id").delete(verifyToken, async (req, res) => {
 });
 
 // Logout Route
-
 router.route("/logout").get(verifyToken, async (req, res) => {
   const uid = req.user.uid;
 

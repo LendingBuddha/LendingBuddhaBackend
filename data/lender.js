@@ -5,6 +5,7 @@ export const lenderData = {
       "totalBorrowers": 350,
       "totalInterestEarned": 320000,
       "defaultRate": 5,
+      "lendorsName" : "Jhon doe",
       "averageLoanAmount": 10500,
       "recentActivity": {
         "recentLoansIssued": [
@@ -22,7 +23,19 @@ export const lenderData = {
           },
           {
             "loanID": 1003,
-            "amount": 12500,
+            "amount": 13500,
+            "borrower": "Bob Johnson",
+            "date": "2024-06-23"
+          },
+          {
+            "loanID": 1004,
+            "amount": 15500,
+            "borrower": "Bob Johnson",
+            "date": "2024-06-23"
+          },
+          {
+            "loanID": 1005,
+            "amount": 23500,
             "borrower": "Bob Johnson",
             "date": "2024-06-23"
           }
