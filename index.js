@@ -8,6 +8,8 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import { lenderData } from "./data/lender.js";
+import chatroomRoute from "./routes/chatroomRoute.js"
+
 
 dotenv.config();
 
@@ -29,7 +31,7 @@ const io = new Server(server, {
 });
 app.use(
   cors({
-    origin: "*",
+    origin: "http://localhost:5173",
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     credentials: true,
   })
@@ -48,6 +50,7 @@ await connectDb()
 
     app.use("/api/auth", AuthRoute);
     app.use("/chatroom", ChatSession);
+    app.use('/api', chatroomRoute);
 
     
     app.get("/api/lender/data", async(req,res)=>{
