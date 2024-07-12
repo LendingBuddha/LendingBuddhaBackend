@@ -8,6 +8,8 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import { lenderData } from "./data/lender.js";
+import chatroomRoute from "./routes/chatroomRoute.js"
+
 
 dotenv.config();
 // for development purpose only
@@ -49,8 +51,10 @@ await connectDb()
 
     app.use("/api/auth", AuthRoute);
     app.use("/chatroom", ChatSession);
+    app.use('/api', chatroomRoute);
 
-    app.get("/api/lender/data", async (req, res) => {
+    
+    app.get("/api/lender/data", async(req,res)=>{
       try {
         const data = lenderData;
         res.status(200).json(data);
