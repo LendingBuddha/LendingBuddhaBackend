@@ -14,6 +14,8 @@ import { upload } from "../middleware/multer.js";
 import admin from "../config/firebase-admin.mjs";
 import path from "node:path";
 
+
+
 const imagekit = new ImageKit({
   publicKey: process.env.PUBLIC_KEY,
   privateKey: process.env.PRIVATE_KEY,
@@ -238,7 +240,7 @@ router.post("/login/lender", async (req, res) => {
       data: {
         email: user.email,
         uid: user.uid,
-        displayName: user.displayName,
+        displayName: user.fullname
       },
       refreshToken: refreshToken,
     });
@@ -589,8 +591,7 @@ router.route("/details/:id").get(verifyToken, async (req, res) => {
   }
 });
 
-// Get ALL User
-
+// Get ALL Lender User
 router.route("/lender/users").get(verifyToken, async (req, res) => {
   try {
     const userType = req.user.type;

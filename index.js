@@ -9,7 +9,7 @@ import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import { lenderData } from "./data/lender.js";
 import chatroomRoute from "./routes/chatroomRoute.js"
-
+import fetchAllLenders from "./routes/fetchAllLenders.js"
 
 dotenv.config();
 // for development purpose only
@@ -30,13 +30,13 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
   },
 });
-app.use(
-  cors({
-    origin: ["*", "http://localhost:5173"],
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    credentials: true,
-  })
-);
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "http://localhost:5173");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Credentials", "true");
+  next();
+});
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 app.use(express.static("public"));
@@ -52,6 +52,7 @@ await connectDb()
     app.use("/api/auth", AuthRoute);
     app.use("/chatroom", ChatSession);
     app.use('/api', chatroomRoute);
+
 
     
     app.get("/api/lender/data", async(req,res)=>{
