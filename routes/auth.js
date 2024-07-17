@@ -238,7 +238,8 @@ router.post("/login/lender", async (req, res) => {
       data: {
         email: user.email,
         uid: user.uid,
-        displayName: user.displayName,
+        displayName: user.fullName,
+        role: "lender"
       },
       refreshToken: refreshToken,
     });
@@ -273,7 +274,8 @@ router.post("/login/borrower", async (req, res) => {
         data: {
           email: user.email,
           uid: user.uid,
-          name: user.displayName,
+          name: user.fullName,
+          role: "borrower",
         },
         refreshToken: refreshToken,
       });
