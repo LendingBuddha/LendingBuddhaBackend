@@ -39,7 +39,7 @@ app.use(
 );
 
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "http://localhost:5173");
+  res.header("Access-Control-Allow-Origin", "https://master.d3vv5xmzi33jqy.amplifyapp.com/Login");
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.header("Access-Control-Allow-Credentials", "true");
@@ -73,7 +73,7 @@ await connectDb()
 
     // send hello world
     app.get("/", (req, res) => {
-      res.send("Hello, World!");
+      res.send("201");
     });
     io.on("connection", (socket) => {
       console.log("New client connected!");
