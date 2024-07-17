@@ -13,7 +13,7 @@ import chatroomRoute from "./routes/chatroomRoute.js"
 
 dotenv.config();
 // for development purpose only
-const allowedOrigins=["http://localhost:5173","http://localhost:5174"];
+const allowedOrigins=["https://master.d3vv5xmzi33jqy.amplifyapp.com"];
 const app = express();
 app.use(
   cors({
@@ -32,7 +32,7 @@ const io = new Server(server, {
 });
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
+    origin: ["https://master.d3vv5xmzi33jqy.amplifyapp.com"],
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     credentials: true,
   })
