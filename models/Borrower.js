@@ -17,33 +17,34 @@ const BorrowerSchema = new Schema(
       type: String,
       required: true,
     },
-    panCard: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-    aadharCard: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-    dateOfBirth: {
-      type: Date,
-      required: true,
-    },
+    // panCard: {
+    //   type: String,
+    //   required:false,
+    //   unique: true,
+    // },
+    // aadharCard: {
+    //   type: String,
+    //   required:false,
+    //   unique: true,
+    // },
+    // dateOfBirth: {
+    //   type: Date,
+    //   required:false,
+    // },
     uid: {
       type: String,
     },
     refreshToken: {
       type: String,
     },
-    profilePic: {
-      type: String,
-    },
-    cibilScore: {
-      type: String,
-      required: true,
-    },
+    // profilePic: {
+    //   type: String,
+    //   required:false,
+    // },
+    // cibilScore: {
+    //   type: String,
+    //   required: true,
+    // },
   },
   {
     timestamps: true,

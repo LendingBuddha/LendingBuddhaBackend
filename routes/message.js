@@ -2,6 +2,8 @@ import { Router } from "express";
 import verifyToken from "../middleware/authencate.js";
 import ChatRoom from "../models/chatRoom.js";
 import { ChatMessage } from "../models/chatMessage.js";
+import { Lender } from "../models/Lender.js";
+import { Borrower } from "../models/Borrower.js";
 
 const router = Router();
 
@@ -26,6 +28,8 @@ router.route("/message/send/:roomId").post(verifyToken, async (req, res) => {
     } else {
       receiverType = "Lender";
     }
+
+
 
     // Assume the receiver is the other participant
     const receiver = chatRoom.participants.find(
@@ -94,7 +98,7 @@ router.route("/create/:id").get(verifyToken, async (req, res) => {
 
   let recevierType;
 
-  if (senderId === "lender") {
+  if (senderType === "lender") {
     recevierType = "Borrower";
   } else {
     recevierType = "Lender";
@@ -102,12 +106,26 @@ router.route("/create/:id").get(verifyToken, async (req, res) => {
 
   console.log(recevierType);
 
+  const senderModel = senderType === 'lender' ? Lender : Borrower;
+  const reciverModel = recevierType === 'lender' ? Lender : Borrower;
+
+  const sender=await senderModel.findById(senderId);
+  const reciver=await reciverModel.findById(receiverId);
+
+  if(!sender || !reciver){
+       return res.status(404).json({message : "User Not Found"})
+  }
+   
+  const senderName=sender.fullname;
+  const reciverName=reciver.fullname;
+
+
   //check chatroom is created or not before
   const chatRoom = await ChatRoom.findOne({
     participants: {
       $all: [
-        { $elemMatch: { userId: senderId, userType: senderType } },
-        { $elemMatch: { userId: receiverId, userType: recevierType } },
+        { $elemMatch: { userId: senderId, userType: senderType,userName:senderName } },
+        { $elemMatch: { userId: receiverId, userType: recevierType ,userName:reciverName} },
       ],
     },
   });

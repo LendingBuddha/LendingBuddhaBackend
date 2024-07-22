@@ -15,6 +15,11 @@ const chatRoomSchema = new Schema(
           enum: ["Lender", "Borrower"],
           required: true,
         },
+        userName:{
+          type:String,
+          required:true
+        }
+       
       },
     ],
     messages: [
