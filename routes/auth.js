@@ -57,15 +57,16 @@ const generateJWT = (uid, type, time) => {
 
 //POST - Register new Lender
 router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
+  console.log("I am here");
   const {
     fullname,
     email,
     password,
-    dob,
-    pancard,
-    aadharcard,
     phonenumber,
-    cibilscore,
+    dob,
+    aadharcard,
+    pancard,
+    // cibilscore,
   } = req.body;
 
   const profilePic = req.file ? req.file.path : null;
@@ -126,6 +127,7 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
       data: createdUser,
     });
   } catch (error) {
+    console.log("I am Error: ", error);
     res.status(500).json({ error: error.message });
   }
 });
