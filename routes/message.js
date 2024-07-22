@@ -21,7 +21,7 @@ router.route("/message/send/:roomId").post(verifyToken, async (req, res) => {
 
     // Determine receiver type based on sender type
     let receiverType;
-    if (senderType === "Lender") {
+    if (senderType === "lender") {
       receiverType = "Borrower";
     } else {
       receiverType = "Lender";
