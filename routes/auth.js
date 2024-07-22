@@ -14,6 +14,8 @@ import { upload } from "../middleware/multer.js";
 import admin from "../config/firebase-admin.mjs";
 import path from "node:path";
 
+
+
 const imagekit = new ImageKit({
   publicKey: process.env.PUBLIC_KEY,
   privateKey: process.env.PRIVATE_KEY,
@@ -212,79 +214,96 @@ router.post("/signup/borrower",upload.single("profilePic"),async (req, res) => {
 // POST- Login user
 router.post("/login/lender", async (req, res) => {
   const { email, password } = req.body;
-  // console.log("Login request received:", req.body);
 
   try {
-    const userCredential = await signInWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
-    // console.log("User signed in:", user);
 
     const accessToken = generateJWT(user.uid, "Lender", "30m");
     const refreshToken = generateJWT(user.uid, "Lender", "30d");
 
+    // Set refresh token in an HTTP-only and secure cookie
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: true,
-      // sameSite: "strict",
     });
 
     res.setHeader("Authorization", `Bearer ${accessToken}`);
+
+    // Retrieve the lender's details from the database
+    const lenderUser = await Lender.findOne({ uid: user.uid }).select("-panCard -aadharCard");
+    if (!lenderUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Send response indicating successful login
     res.status(200).json({
       message: "Lender logged in successfully",
       data: {
-        email: user.email,
-        uid: user.uid,
-        displayName: user.fullName,
-        role: "lender"
+        email: lenderUser.email,
+        uid: lenderUser.uid,
+        name: lenderUser.fullname,
+        role: "lender",
+        phoneNumber: lenderUser.phoneNumber,
       },
       refreshToken: refreshToken,
     });
   } catch (error) {
     console.error("Error during login:", error.message);
-    res.status(500).send(error.message);
+    res.status(500).json({
+      message: "Error in Login Lender Route",
+      error: error.message,
+    });
   }
 });
 
+
+
+// login borrower
 router.post("/login/borrower", async (req, res) => {
   const { email, password } = req.body;
- 
-  signInWithEmailAndPassword(auth, email, password)
-    .then((userCredential) => {
-      // Signed in
-      const user = userCredential.user;
-      const accessToken = generateJWT(user.uid, "Borrower", "30m");
-      const refreshToken = generateJWT(user.uid, "Borrower", "30d");
 
-      // Set refresh token in an HTTP-only and secure cookie
-      res.cookie("refreshToken", refreshToken, {
-        httpOnly: true,
-        secure: true,
-        // sameSite: "strict",
-      });
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    const accessToken = generateJWT(user.uid, "Borrower", "30m");
+    const refreshToken = generateJWT(user.uid, "Borrower", "30d");
 
-      res.setHeader("Authorization", `Bearer ${accessToken}`);
-
-      // Send response indicating successful login
-      res.status(200).json({
-        message: "Borrower logged in successfully",
-        data: {
-          email: user.email,
-          uid: user.uid,
-          name: user.fullName,
-          role: "borrower",
-        },
-        refreshToken: refreshToken,
-      });
-    })
-    .catch((error) => {
-      const errorMessage = error.message;
-      res.status(500).send(errorMessage);
+    // Set refresh token in an HTTP-only and secure cookie
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: true,
     });
+
+    res.setHeader("Authorization", `Bearer ${accessToken}`);
+
+    // Retrieve the borrower's details from the database
+    const borrowerUser = await Borrower.findOne({ uid: user.uid }).select("-panCard -aadharCard");
+    if (!borrowerUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Send response indicating successful login
+    res.status(200).json({
+      message: "Borrower logged in successfully",
+      data: {
+        email: borrowerUser.email,
+        uid: borrowerUser.uid,
+        name: borrowerUser.fullname,
+        role: "borrower",
+        phoneNumber: borrowerUser.phoneNumber,
+      },
+      refreshToken: refreshToken,
+    });
+  } catch (error) {
+    console.error("Error in login borrower route:", error);
+    res.status(500).json({
+      message: "Error in Login Borrower Route",
+      error: error.message,
+    });
+  }
 });
+
 
 // GET - HOME_ROUTE
 router.route("/lenderhome").get(verifyToken, async (req, res) => {
@@ -591,8 +610,7 @@ router.route("/details/:id").get(verifyToken, async (req, res) => {
   }
 });
 
-// Get ALL User
-
+// Get ALL Lender User
 router.route("/lender/users").get(verifyToken, async (req, res) => {
   try {
     const userType = req.user.type;
