@@ -13,12 +13,13 @@ import fetchAllLenders from "./routes/fetchAllLenders.js"
 
 dotenv.config();
 // for development purpose only
-const allowedOrigins=["http://localhost:5173","http://localhost:5174"];
+const allowedOrigins=["https://master.d3vv5xmzi33jqy.amplifyapp.com"];
 const app = express();
 app.use(
   cors({
-    origin:allowedOrigins ,
+    origin: "https://master.d3vv5xmzi33jqy.amplifyapp.com" ,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    
     credentials: true,
   })
 );
@@ -26,8 +27,9 @@ app.use(
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
-    methods: ["GET", "POST"],
+    origin: "https://master.d3vv5xmzi33jqy.amplifyapp.com",
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    credentials : true,
   },
 });
 app.use((req, res, next) => {
@@ -66,7 +68,7 @@ await connectDb()
 
     // send hello world
     app.get("/", (req, res) => {
-      res.send("Hello, World!");
+      res.send("201");
     });
     io.on("connection", (socket) => {
       console.log("New client connected!");

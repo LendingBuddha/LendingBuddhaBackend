@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 
 const verifyToken = (req, res, next) => {
   // Get token from cookies or Authorization header
-  const idToken = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "");
+  const idToken = req.cookies?.refreshToken || req.header("Authorization")?.replace("Bearer ", "");
 
   // Check if token is undefined or empty
   if (!idToken) {
