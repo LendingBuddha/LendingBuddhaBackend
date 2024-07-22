@@ -61,11 +61,11 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
     fullname,
     email,
     password,
-    dob,
-    pancard,
-    aadharcard,
+    // dob,
+    // pancard,
+    // aadharcard,
     phonenumber,
-    cibilscore,
+    // cibilscore,
   } = req.body;
 
   const profilePic = req.file ? req.file.path : null;
@@ -94,11 +94,11 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
       email,
       fullname,
       phoneNumber: phonenumber,
-      dateOfBirth: dob,
-      panCard: pancard,
-      cibilScore: cibilscore,
-      aadharCard: aadharcard,
-      profilePic: result.url,
+      // dateOfBirth: dob,
+      // panCard: pancard,
+      // cibilScore: cibilscore,
+      // aadharCard: aadharcard,
+      // profilePic: result.url,
     });
 
     // If database entry is successful, create user in Firebase
@@ -136,11 +136,11 @@ router.post("/signup/borrower",upload.single("profilePic"),async (req, res) => {
       fullname,
       email,
       password,
-      dob,
-      pancard,
-      aadharcard,
+      // dob,
+      // pancard,
+      // aadharcard,
       phonenumber,
-      cibilscore,
+      // cibilscore,
     } = req.body;
     const profilePic = req.file?.path;
 
@@ -164,11 +164,11 @@ router.post("/signup/borrower",upload.single("profilePic"),async (req, res) => {
         email,
         fullname,
         phoneNumber: phonenumber,
-        dateOfBirth: dob,
-        panCard: pancard,
-        aadharCard: aadharcard,
-        cibilScore: cibilscore,
-        profilePic: result.url,
+        // dateOfBirth: dob,
+        // panCard: pancard,
+        // aadharCard: aadharcard,
+        // cibilScore: cibilscore,
+        // profilePic: result.url,
       });
 
       // Create user in Firebase Authentication

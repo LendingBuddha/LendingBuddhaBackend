@@ -17,29 +17,30 @@ const LenderSchema = new Schema(
       type: String,
       required: true,
     },
-    panCard: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-    aadharCard: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-    dateOfBirth: {
-      type: Date,
-      required: true,
-    },
+    // panCard: {
+    //   type: String,
+    //   required:false,
+    //   unique: true,
+    // },
+    // aadharCard: {
+    //   type: String,
+    //   required:false,
+    //   unique: true,
+    // },
+    // dateOfBirth: {
+    //   type: Date,
+    //   required:false,
+    // },
     uid: {
       type: String,
     },
     refreshToken: {
       type: String,
     },
-    profilePic: {
-      type: String,
-    },
+    // profilePic: {
+    //   type: String,
+    //   required:false,
+    // },
   },
   {
     timestamps: true,
