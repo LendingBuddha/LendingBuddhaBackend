@@ -22,32 +22,32 @@ const imagekit = new ImageKit({
   urlEndpoint: process.env.URL_ENDPOINT,
 });
 
-async function uploadImage(filePath) {
-  try {
-    // console.log(filePath);
-    if (!filePath) throw new Error("Could not find the path");
+// async function uploadImage(filePath) {
+//   try {
+//     // console.log(filePath);
+//     if (!filePath) throw new Error("Could not find the path");
 
-    // Read file data
-    const data = await fs.readFile(filePath);
-    const base64data = Buffer.from(data).toString("base64");
+//     // Read file data
+//     const data = await fs.readFile(filePath);
+//     const base64data = Buffer.from(data).toString("base64");
 
-    // Upload to ImageKit
-    const result = await imagekit.upload({
-      // file: filePath.path,
-      file: base64data,
-      fileName: "Image",
-    });
-    // console.log(result);
-    const fullPath = path.resolve(filePath);
-    // Delete local file after successful upload
-    await fs.unlink(fullPath);
+//     // Upload to ImageKit
+//     const result = await imagekit.upload({
+//       // file: filePath.path,
+//       file: base64data,
+//       fileName: "Image",
+//     });
+//     // console.log(result);
+//     const fullPath = path.resolve(filePath);
+//     // Delete local file after successful upload
+//     await fs.unlink(fullPath);
 
-    return result;
-  } catch (error) {
-    console.log({ message: error.message }); // Log the error message
-    throw error; // Propagate the error for further handling
-  }
-}
+//     return result;
+//   } catch (error) {
+//     console.log({ message: error.message }); // Log the error message
+//     throw error; // Propagate the error for further handling
+//   }
+// }
 
 const router = Router();
 
@@ -70,29 +70,29 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
     // cibilscore,
   } = req.body;
 
-  const profilePic = req.file ? req.file.path : null;
+  // const profilePic = req.file ? req.file.path : null;
 
-  if (!profilePic) {
-    return res.status(400).json({ error: "Profile Pic is required" });
-  }
+  // if (!profilePic) {
+  //   return res.status(400).json({ error: "Profile Pic is required" });
+  // }
 
   try {
     // Check if the user already exists in the database
-    const LenderUser = await Lender.findOne({ email });
-    if (LenderUser) {
+    const existingLender = await Lender.findOne({ email });
+    if (existingLender) {
       return res.status(400).json({ error: "User already exists" });
     }
 
-    // Upload profile picture
-    const result = await uploadImage(profilePic);
-    if (!result || !result.url) {
-      return res
-        .status(500)
-        .json({ error: "Failed to upload profile picture" });
-    }
+    // // Upload profile picture
+    // const result = await uploadImage(profilePic);
+    // if (!result || !result.url) {
+    //   return res
+    //     .status(500)
+    //     .json({ error: "Failed to upload profile picture" });
+    // }
 
     // Save user details in the database
-    const Lenderuser = await Lender.create({
+    const lenderUser = await Lender.create({
       email,
       fullname,
       phoneNumber: phonenumber,
@@ -112,104 +112,136 @@ router.post("/signup/lender", upload.single("profilePic"), async (req, res) => {
     const user = userCredential.user;
 
     // Update the database entry with the Firebase user ID
-    Lenderuser.uid = user.uid;
-    await Lenderuser.save();
+    lenderUser.uid = user.uid;
+    await lenderUser.save();
 
     // Retrieve the created user without sensitive information
-    const createdUser = await Lender.findById(Lenderuser._id).select(
-      "-panCard -aadharCard"
-    );
+    const createdUser = await Lender.findById(lenderUser._id)
     if (!createdUser) {
       return res.status(500).send("Internal Error");
     }
 
+    // Generate access and refresh tokens
+    const accessToken = generateJWT(user.uid, "Lender", "30m");
+    const refreshToken = generateJWT(user.uid, "Lender", "30d");
+
+    // Set refresh token in an HTTP-only and secure cookie
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: true,
+    });
+
+    res.setHeader("Authorization", `Bearer ${accessToken}`);
+
+    // Respond with success message and user data
     res.status(201).json({
       message: "Lender User created",
-      data: createdUser,
+      data: {
+        email: createdUser.email,
+        uid: createdUser.uid,
+        name: createdUser.fullname,
+        role: "lender",
+        phoneNumber: createdUser.phoneNumber,
+      },
+      refreshToken: refreshToken,
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    // Handle errors
+    console.error("Error in signup lender route:", error);
+    res.status(500).json({
+      message: "Error in Signup Lender Route",
+      error: error.message,
+    });
   }
 });
 
+
 // post route Borrower
-router.post("/signup/borrower",upload.single("profilePic"),async (req, res) => {
-    const {
-      fullname,
-      email,
-      password,
-      // dob,
-      // pancard,
-      // aadharcard,
-      phonenumber,
-      // cibilscore,
-    } = req.body;
-    const profilePic = req.file?.path;
+router.post("/signup/borrower", upload.single("profilePic"), async (req, res) => {
+  const {
+    fullname,
+    email,
+    password,
+    // dob,
+    // pancard,
+    // aadharcard,
+    phonenumber,
+    // cibilscore,
+  } = req.body;
+  // const profilePic = req.file?.path;
 
-    try {
-      // Check if user already exists
-      const existingBorrower = await Borrower.findOne({ email });
-      if (existingBorrower) {
-        return res.status(400).json({ error: "User already exists" });
-      }
-
-      // Upload profile picture
-      const result = await uploadImage(profilePic);
-      if (!result || !result.url) {
-        return res
-          .status(500)
-          .json({ error: "Failed to upload profile picture" });
-      }
-
-      // Save user details in the database
-      const borrowerUser = await Borrower.create({
-        email,
-        fullname,
-        phoneNumber: phonenumber,
-        // dateOfBirth: dob,
-        // panCard: pancard,
-        // aadharCard: aadharcard,
-        // cibilScore: cibilscore,
-        // profilePic: result.url,
-      });
-
-      // Create user in Firebase Authentication
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      const user = userCredential.user;
-
-      // Update the database entry with the Firebase user ID
-      borrowerUser.uid = user.uid;
-      await borrowerUser.save();
-
-      // Retrieve the created user without sensitive information
-      const createdUser = await Borrower.findById(borrowerUser._id).select(
-        "-panCard -aadharCard"
-      );
-      if (!createdUser) {
-        return res.status(500).send("Internal Error");
-      }
-
-      // Respond with success message and user data
-      res.status(201).json({
-        message: "Borrower User created",
-        data: createdUser,
-      });
-    } catch (error) {
-      // Handle errors
-      console.error("Error in signup borrower route:", error);
-      res
-        .status(500)
-        .json({
-          message: "Error in Signup Borrower Route",
-          error: error.message,
-        });
+  try {
+    // Check if user already exists
+    const existingBorrower = await Borrower.findOne({ email });
+    if (existingBorrower) {
+      return res.status(400).json({ error: "User already exists" });
     }
+
+    // Save user details in the database
+    const borrowerUser = await Borrower.create({
+      email,
+      fullname,
+      phoneNumber: phonenumber,
+      // dateOfBirth: dob,
+      // panCard: pancard,
+      // aadharCard: aadharcard,
+      // cibilScore: cibilscore,
+      // profilePic: result.url,
+    });
+
+    // Create user in Firebase Authentication
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
+    const user = userCredential.user;
+
+    // Update the database entry with the Firebase user ID
+    borrowerUser.uid = user.uid;
+    await borrowerUser.save();
+
+    // Retrieve the created user without sensitive information
+    const createdUser = await Borrower.findById(borrowerUser._id)
+
+    if (!createdUser) {
+      return res.status(500).send("Internal Error");
+    }
+
+    // Generate access and refresh tokens
+    const accessToken = generateJWT(user.uid, "Borrower", "30m");
+    const refreshToken = generateJWT(user.uid, "Borrower", "30d");
+
+    // Set refresh token in an HTTP-only and secure cookie
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: true,
+    });
+
+    res.setHeader("Authorization", `Bearer ${accessToken}`);
+
+    // Respond with success message and user data
+    res.status(201).json({
+      message: "Borrower User created",
+      data: {
+        email: createdUser.email,
+        uid: createdUser.uid,
+        name: createdUser.fullname,
+        role: "borrower",
+        phoneNumber: createdUser.phoneNumber,
+      },
+      refreshToken: refreshToken,
+    });
+  } catch (error) {
+    // Handle errors
+    console.error("Error in signup borrower route:", error);
+    res.status(500).json({
+      message: "Error in Signup Borrower Route",
+      error: error.message,
+    });
   }
-);
+});
+
 
 // POST- Login user
 router.post("/login/lender", async (req, res) => {
